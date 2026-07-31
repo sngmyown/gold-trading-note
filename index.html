@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="금 선물 매매 복기 대시보드" />
+  <title>Gold Futures Trading Review</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">GOLD FUTURES TRADING REVIEW</p>
+      <h1>금 선물 매매 복기 대시보드</h1>
+      <p class="subtitle">사전 분석, 실행, 심리, 복기와 성과를 한 흐름으로 기록합니다.</p>
+    </div>
+    <div class="header-status">
+      <div><span>오늘</span><strong id="todayLabel">-</strong></div>
+      <div><span>오늘 분석</span><strong id="analysisStatus">미작성</strong></div>
+      <div><span>선택 계좌</span><strong id="activeAccountLabel">전체</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <div id="storageWarning" class="warning hidden"></div>
+
+    <nav class="view-tabs" aria-label="주요 화면">
+      <button class="tab active" data-view="analysis">오늘의 금 분석</button>
+      <button class="tab" data-view="trades">거래 기록</button>
+      <button class="tab" data-view="daily">일간 마감</button>
+      <button class="tab" data-view="analytics">주·월간 통계</button>
+      <button class="tab" data-view="settings">설정·백업</button>
+    </nav>
+
+    <section class="view active" id="analysisView">
+      <div class="section-card account-gate">
+        <div class="section-head split">
+          <div>
+            <p class="eyebrow">PRE-MARKET ROUTINE</p>
+            <h2>오늘의 금 시장 관점</h2>
+            <p>계좌를 선택하기 전에 오늘의 방향성과 시나리오를 정리합니다.</p>
+          </div>
+          <div class="date-control">
+            <label for="analysisDate">분석 날짜</label>
+            <input id="analysisDate" type="date" />
+          </div>
+        </div>
+
+        <form id="analysisForm" class="form-stack">
+          <div class="field-grid three">
+            <label class="form-field">
+              <span>핵심 방향성</span>
+              <select id="marketBias">
+                <option value="neutral">중립</option>
+                <option value="bullish">상승</option>
+                <option value="bearish">하락</option>
+              </select>
+            </label>
+            <label class="form-field">
+              <span>확신도</span>
+              <select id="biasConfidence">
+                <option value="1">1 · 낮음</option>
+                <option value="2">2</option>
+                <option value="3" selected>3 · 보통</option>
+                <option value="4">4</option>
+                <option value="5">5 · 높음</option>
+              </select>
+            </label>
+            <label class="form-field">
+              <span>오늘 거래 제한</span>
+              <select id="tradePermission">
+                <option value="normal">정상 거래</option>
+                <option value="reduced">규모 축소</option>
+                <option value="wait">조건 충족 전 대기</option>
+                <option value="no-trade">거래 금지</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="field-grid two">
+            <label class="form-field">
+              <span>주요 지지 가격</span>
+              <input id="keySupport" type="text" placeholder="예: 2,345 / 2,332" />
+            </label>
+            <label class="form-field">
+              <span>주요 저항 가격</span>
+              <input id="keyResistance" type="text" placeholder="예: 2,365 / 2,378" />
+            </label>
+          </div>
+
+          <div class="field-grid two">
+            <label class="form-field">
+              <span>상승 시나리오</span>
+              <textarea id="bullScenario" rows="4" placeholder="어떤 조건에서 상승 시나리오가 유효한가"></textarea>
+            </label>
+            <label class="form-field">
+              <span>하락 시나리오</span>
+              <textarea id="bearScenario" rows="4" placeholder="어떤 조건에서 하락 시나리오가 유효한가"></textarea>
+            </label>
+          </div>
+
+          <label class="form-field">
+            <span>오늘의 핵심 메모</span>
+            <textarea id="analysisSummary" rows="5" placeholder="오늘 반드시 기억할 시장 구조와 행동 원칙"></textarea>
+          </label>
+
+          <details class="details-panel">
+            <summary>상세 분석 열기</summary>
+            <div class="details-content">
+              <div class="field-grid two">
+                <label class="form-field"><span>월봉·주봉 관점</span><textarea id="higherTimeframe" rows="4"></textarea></label>
+                <label class="form-field"><span>일봉·인트라데이 관점</span><textarea id="lowerTimeframe" rows="4"></textarea></label>
+              </div>
+              <div class="field-grid two">
+                <label class="form-field"><span>달러·금리·실질금리</span><textarea id="macroCorrelation" rows="4"></textarea></label>
+                <label class="form-field"><span>다른 자산과의 상관성</span><textarea id="assetCorrelation" rows="4"></textarea></label>
+              </div>
+              <div class="field-grid two">
+                <label class="form-field"><span>경제 일정·뉴스 위험</span><textarea id="eventRisk" rows="4"></textarea></label>
+                <label class="form-field"><span>무효화 조건·No Trade 조건</span><textarea id="invalidation" rows="4"></textarea></label>
+              </div>
+            </div>
+          </details>
+
+          <div class="upload-block">
+            <div>
+              <h3>분석 차트 업로드</h3>
+              <p class="muted">월봉·주봉·일봉 또는 장중 분석 이미지를 저장할 수 있습니다.</p>
+            </div>
+            <label class="file-button">
+              이미지 선택
+              <input id="analysisImages" type="file" accept="image/*" multiple />
+            </label>
+          </div>
+          <div id="analysisImageList" class="image-grid"></div>
+
+          <div class="form-actions">
+            <button class="button primary" type="submit">오늘 분석 저장</button>
+            <button class="button ghost" id="clearAnalysisButton" type="button">입력 초기화</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head split">
+          <div>
+            <p class="eyebrow">ACCOUNT CONTEXT</p>
+            <h2>계좌 선택</h2>
+            <p>데모와 실제 계좌는 색상과 통계를 완전히 분리합니다.</p>
+          </div>
+          <button class="button ghost" id="showAllAccounts" type="button">전체 계좌 보기</button>
+        </div>
+        <div class="account-selector">
+          <button class="account-card demo" data-account="demo" type="button">
+            <span class="account-kicker">PRACTICE</span>
+            <strong>DEMO ACCOUNT</strong>
+            <span>연습·실험·프레임워크 검증</span>
+          </button>
+          <button class="account-card live" data-account="live" type="button">
+            <span class="account-kicker">REAL CAPITAL</span>
+            <strong>LIVE ACCOUNT</strong>
+            <span>실제 자금·심리·리스크 관리</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="tradesView">
+      <div id="accountBanner" class="account-banner all">
+        <div><span>현재 기록 계좌</span><strong>전체</strong></div>
+        <button id="changeAccountButton" class="button ghost" type="button">계좌 변경</button>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head split">
+          <div>
+            <p class="eyebrow">TRADE ENTRY</p>
+            <h2>새 거래 기록</h2>
+            <p>필수 복기는 짧게, 중요한 거래만 상세하게 기록합니다.</p>
+          </div>
+          <label class="form-field compact-field">
+            <span>복기 깊이</span>
+            <select id="reviewDepth">
+              <option value="quick">간단 복기</option>
+              <option value="standard" selected>정상 복기</option>
+              <option value="deep">심층 복기</option>
+            </select>
+          </label>
+        </div>
+
+        <form id="tradeForm" class="form-stack">
+          <input id="tradeId" type="hidden" />
+          <div class="field-grid four">
+            <label class="form-field"><span>계좌</span><select id="tradeAccount"><option value="demo">데모</option><option value="live">실제</option></select></label>
+            <label class="form-field"><span>거래일</span><input id="tradeDate" type="date" required /></label>
+            <label class="form-field"><span>종목</span><select id="tradeSymbol"><option value="GC">GC</option><option value="MGC">MGC</option><option value="CUSTOM">사용자 지정</option></select></label>
+            <label class="form-field"><span>방향</span><select id="tradeDirection"><option value="long">Long</option><option value="short">Short</option></select></label>
+          </div>
+
+          <div class="field-grid four">
+            <label class="form-field"><span>진입 시간</span><input id="entryTime" type="time" /></label>
+            <label class="form-field"><span>청산 시간</span><input id="exitTime" type="time" /></label>
+            <label class="form-field"><span>계약 수</span><input id="contracts" type="number" min="0.01" step="0.01" value="1" /></label>
+            <label class="form-field"><span>수수료</span><input id="fees" type="number" step="0.01" value="0" /></label>
+          </div>
+
+          <div class="field-grid four">
+            <label class="form-field"><span>진입 가격</span><input id="entryPrice" type="number" step="0.01" required /></label>
+            <label class="form-field"><span>손절 가격</span><input id="stopPrice" type="number" step="0.01" /></label>
+            <label class="form-field"><span>목표 가격</span><input id="targetPrice" type="number" step="0.01" /></label>
+            <label class="form-field"><span>청산 가격</span><input id="exitPrice" type="number" step="0.01" required /></label>
+          </div>
+
+          <div class="calculation-strip">
+            <div><span>예상 손익비</span><strong id="plannedRR">-</strong></div>
+            <div><span>실제 R</span><strong id="actualR">-</strong></div>
+            <div><span>보유 시간</span><strong id="durationValue">-</strong></div>
+            <div><span>예상 순손익</span><strong id="calculatedPnl">-</strong></div>
+          </div>
+
+          <label class="form-field">
+            <span>진입 이유</span>
+            <textarea id="tradeReason" rows="4" placeholder="왜 이 자리에서 진입했는가"></textarea>
+          </label>
+
+          <div class="field-grid two">
+            <label class="form-field"><span>잘한 점</span><textarea id="tradeStrengths" rows="4"></textarea></label>
+            <label class="form-field"><span>잘못한 점</span><textarea id="tradeMistakes" rows="4"></textarea></label>
+          </div>
+
+          <div class="field-grid two">
+            <label class="form-field"><span>다음에 바꿀 행동</span><textarea id="nextAction" rows="4"></textarea></label>
+            <label class="form-field"><span>당시 심리 상태</span><textarea id="psychology" rows="4" placeholder="불안, 확신, 조급함, 복수매매 충동 등"></textarea></label>
+          </div>
+
+          <label class="form-field">
+            <span>거래 복기</span>
+            <textarea id="tradeReview" rows="5" placeholder="왜 벌었고 왜 잃었는지, 무엇을 놓쳤는지"></textarea>
+          </label>
+
+          <details class="details-panel" id="tradeDetailsPanel">
+            <summary>상세 복기 열기</summary>
+            <div class="details-content">
+              <div class="field-grid two">
+                <label class="form-field"><span>프레임워크·셋업 태그</span><input id="frameworkTags" type="text" placeholder="예: 유동성 스윕, 뉴욕 오픈, 돌파 재시험" /></label>
+                <label class="form-field"><span>사용 시간 프레임</span><input id="timeframes" type="text" placeholder="예: 일봉, 1시간, 5분" /></label>
+              </div>
+              <div class="field-grid three">
+                <label class="form-field"><span>분석 품질</span><input id="analysisScore" type="number" min="1" max="5" value="3" /></label>
+                <label class="form-field"><span>실행 품질</span><input id="executionScore" type="number" min="1" max="5" value="3" /></label>
+                <label class="form-field"><span>감정 통제</span><input id="emotionScore" type="number" min="1" max="5" value="3" /></label>
+              </div>
+              <div class="check-grid">
+                <label><input id="followedPlan" type="checkbox" /> 계획대로 실행</label>
+                <label><input id="ruleViolation" type="checkbox" /> 규칙 위반</label>
+                <label><input id="revengeTrade" type="checkbox" /> 복수매매</label>
+                <label><input id="macroAligned" type="checkbox" /> 오늘의 매크로와 일치</label>
+              </div>
+            </div>
+          </details>
+
+          <div class="upload-block">
+            <div>
+              <h3>거래 차트 업로드</h3>
+              <p class="muted">진입 전·진행 중·청산 후 차트를 여러 장 저장할 수 있습니다.</p>
+            </div>
+            <label class="file-button">이미지 선택<input id="tradeImages" type="file" accept="image/*" multiple /></label>
+          </div>
+          <div id="tradeImageList" class="image-grid"></div>
+
+          <div class="form-actions">
+            <button class="button primary" type="submit">거래 저장</button>
+            <button class="button ghost" id="resetTradeButton" type="button">새 입력</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head split">
+          <div><h2>거래 기록</h2><p>계좌·기간·결과별로 필터링할 수 있습니다.</p></div>
+          <div class="filter-row">
+            <select id="tradeAccountFilter"><option value="all">전체 계좌</option><option value="demo">데모</option><option value="live">실제</option></select>
+            <select id="tradeResultFilter"><option value="all">전체 결과</option><option value="win">수익</option><option value="loss">손실</option><option value="breakeven">본전</option></select>
+            <input id="tradeSearch" type="search" placeholder="근거·복기·태그 검색" />
+          </div>
+        </div>
+        <div id="tradeList" class="trade-list"></div>
+      </div>
+    </section>
+
+    <section class="view" id="dailyView">
+      <div class="section-card">
+        <div class="section-head split">
+          <div><p class="eyebrow">DAILY CLOSE</p><h2>일간 마감</h2><p>하루의 손익보다 행동과 반복 패턴을 마감합니다.</p></div>
+          <label class="form-field compact-field"><span>날짜</span><input id="dailyDate" type="date" /></label>
+        </div>
+
+        <div id="dailyStats" class="summary-grid"></div>
+
+        <form id="dailyReviewForm" class="form-stack section-inner">
+          <div class="field-grid two">
+            <label class="form-field"><span>오늘 가장 잘한 행동</span><textarea id="dailyBest" rows="4"></textarea></label>
+            <label class="form-field"><span>오늘 가장 큰 실수</span><textarea id="dailyMistake" rows="4"></textarea></label>
+          </div>
+          <div class="field-grid two">
+            <label class="form-field"><span>내일 지킬 한 가지</span><textarea id="dailyKeep" rows="3"></textarea></label>
+            <label class="form-field"><span>내일 피할 한 가지</span><textarea id="dailyAvoid" rows="3"></textarea></label>
+          </div>
+          <label class="form-field"><span>오늘의 한 문장 결론</span><textarea id="dailyConclusion" rows="3"></textarea></label>
+          <div class="form-actions"><button class="button primary" type="submit">일간 마감 저장</button></div>
+        </form>
+      </div>
+    </section>
+
+    <section class="view" id="analyticsView">
+      <div class="section-card">
+        <div class="section-head split">
+          <div><p class="eyebrow">PERFORMANCE REVIEW</p><h2>주·월간 통계</h2><p>데모와 실제 계좌의 결과와 실행 품질을 비교합니다.</p></div>
+          <div class="filter-row">
+            <select id="analyticsPeriod"><option value="week">최근 7일</option><option value="month" selected>이번 달</option><option value="previousMonth">지난달</option><option value="all">전체</option></select>
+            <select id="analyticsAccount"><option value="all">전체 계좌</option><option value="demo">데모</option><option value="live">실제</option></select>
+          </div>
+        </div>
+
+        <div id="analyticsSummary" class="summary-grid analytics-grid"></div>
+
+        <div class="chart-grid">
+          <article class="chart-card">
+            <div class="chart-head"><h3>일별 순손익</h3><span id="pnlChartCaption"></span></div>
+            <div id="dailyPnlChart" class="svg-chart"></div>
+          </article>
+          <article class="chart-card">
+            <div class="chart-head"><h3>누적 손익</h3><span>거래 순서 기준</span></div>
+            <div id="equityChart" class="svg-chart"></div>
+          </article>
+        </div>
+
+        <div class="comparison-grid">
+          <article class="section-card compact-card"><h3>데모·실제 비교</h3><div id="accountComparison"></div></article>
+          <article class="section-card compact-card"><h3>반복 패턴</h3><div id="patternSummary"></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="settingsView">
+      <div class="settings-grid">
+        <article class="section-card">
+          <div class="section-head"><h2>상품 설정</h2><p>가격이 1달러 움직일 때 계약당 손익을 설정합니다.</p></div>
+          <form id="contractSettingsForm" class="form-stack">
+            <label class="form-field"><span>GC 계약 승수</span><input id="gcMultiplier" type="number" step="0.01" value="100" /></label>
+            <label class="form-field"><span>MGC 계약 승수</span><input id="mgcMultiplier" type="number" step="0.01" value="10" /></label>
+            <label class="form-field"><span>사용자 지정 계약 승수</span><input id="customMultiplier" type="number" step="0.01" value="1" /></label>
+            <button class="button primary" type="submit">설정 저장</button>
+          </form>
+        </article>
+
+        <article class="section-card">
+          <div class="section-head"><h2>백업·복원</h2><p>텍스트 기록과 업로드 이미지를 하나의 JSON 파일로 관리합니다.</p></div>
+          <div class="form-stack">
+            <button id="exportBackupButton" class="button primary" type="button">전체 백업 내보내기</button>
+            <label class="file-button full">백업 파일 불러오기<input id="importBackupInput" type="file" accept="application/json" /></label>
+            <button id="clearAllButton" class="button danger" type="button">전체 데이터 삭제</button>
+          </div>
+        </article>
+      </div>
+
+      <article class="section-card">
+        <div class="section-head"><h2>데이터 현황</h2><p>현재 브라우저에 저장된 기록 수입니다.</p></div>
+        <div id="dataStatus" class="summary-grid"></div>
+      </article>
+    </section>
+  </main>
+
+  <div id="imageViewer" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card image-modal-card">
+      <button class="modal-close" data-close-modal type="button" aria-label="닫기">×</button>
+      <img id="imageViewerImage" alt="업로드 차트 확대 이미지" />
+      <p id="imageViewerCaption"></p>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card confirm-card">
+      <h3 id="confirmTitle">확인</h3>
+      <p id="confirmMessage"></p>
+      <div class="form-actions">
+        <button id="confirmCancel" class="button ghost" type="button">취소</button>
+        <button id="confirmAccept" class="button danger" type="button">확인</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
