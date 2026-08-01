@@ -15,10 +15,67 @@
       <h1>금 선물 매매 복기 대시보드</h1>
       <p class="subtitle">사전 분석, 실행, 심리, 복기와 성과를 한 흐름으로 기록합니다.</p>
     </div>
-    <div class="header-status">
-      <div><span>오늘</span><strong id="todayLabel">-</strong></div>
-      <div><span>오늘 분석</span><strong id="analysisStatus">미작성</strong></div>
-      <div><span>선택 계좌</span><strong id="activeAccountLabel">전체</strong></div>
+    <div class="header-dashboard">
+      <div class="header-status">
+        <div><span>오늘</span><strong id="todayLabel">-</strong></div>
+        <div><span>오늘 분석</span><strong id="analysisStatus">미작성</strong></div>
+        <div><span>선택 계좌</span><strong id="activeAccountLabel">전체</strong></div>
+      </div>
+
+      <section class="strategy-goal-card" aria-labelledby="strategyGoalLabel">
+        <div class="strategy-goal-head">
+          <div>
+            <span id="strategyGoalLabel">현재 전략 목표</span>
+            <small>매매 전 반드시 확인할 원칙</small>
+          </div>
+          <button id="editStrategyGoalButton" class="strategy-goal-edit" type="button">목표 입력</button>
+        </div>
+
+        <p id="strategyGoalText" class="strategy-goal-text empty">목표를 입력하면 모든 화면 상단에 계속 표시됩니다.</p>
+
+        <form id="strategyGoalForm" class="strategy-goal-editor hidden">
+          <label class="form-field">
+            <span>목표 문구</span>
+            <textarea id="strategyGoalInput" rows="4" maxlength="500" placeholder="예: 추세 확인 후 볼린저밴드 전략만 사용한다."></textarea>
+          </label>
+
+          <div class="strategy-goal-color-row">
+            <span>글자 색상</span>
+            <div class="strategy-goal-colors" role="radiogroup" aria-label="목표 글자 색상">
+              <label class="goal-color-option">
+                <input type="radio" name="strategyGoalColor" value="#f4f7fb" />
+                <span class="goal-color-chip" style="--goal-color:#f4f7fb">하양</span>
+              </label>
+              <label class="goal-color-option">
+                <input type="radio" name="strategyGoalColor" value="#65a9ff" />
+                <span class="goal-color-chip" style="--goal-color:#65a9ff">파랑</span>
+              </label>
+              <label class="goal-color-option">
+                <input type="radio" name="strategyGoalColor" value="#ff7373" />
+                <span class="goal-color-chip" style="--goal-color:#ff7373">빨강</span>
+              </label>
+              <label class="goal-color-option">
+                <input type="radio" name="strategyGoalColor" value="#44d48b" />
+                <span class="goal-color-chip" style="--goal-color:#44d48b">초록</span>
+              </label>
+              <label class="goal-color-option">
+                <input type="radio" name="strategyGoalColor" value="#f1c75b" />
+                <span class="goal-color-chip" style="--goal-color:#f1c75b">노랑</span>
+              </label>
+              <label class="goal-color-option">
+                <input type="radio" name="strategyGoalColor" value="#ff9d57" />
+                <span class="goal-color-chip" style="--goal-color:#ff9d57">주황</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="strategy-goal-actions">
+            <button class="button primary" type="submit">목표 저장</button>
+            <button id="cancelStrategyGoalButton" class="button ghost" type="button">취소</button>
+            <button id="clearStrategyGoalButton" class="button danger" type="button">목표 삭제</button>
+          </div>
+        </form>
+      </section>
     </div>
   </header>
 
