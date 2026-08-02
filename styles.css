@@ -229,6 +229,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .field-grid.two { grid-template-columns: repeat(2, minmax(0,1fr)); }
 .field-grid.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
 .field-grid.four { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.field-grid.five { grid-template-columns: repeat(5, minmax(0,1fr)); }
 .form-field { display: grid; gap: 7px; }
 .form-field > span { color: var(--muted); font-size: 12px; font-weight: 700; }
 .details-panel { border: 1px solid var(--border); border-radius: 15px; background: rgba(255,255,255,.025); overflow: hidden; }
@@ -303,6 +304,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .badge.loss { color: var(--red); border-color: rgba(255,115,115,.45); background: rgba(255,115,115,.08); }
 .badge.demo { color: var(--blue); }
 .badge.live { color: var(--gold); }
+.badge.asset { color: var(--text); background: rgba(255,255,255,.06); }
 .trade-metrics { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 9px; margin-bottom: 13px; }
 .trade-metrics div { padding: 10px; background: rgba(255,255,255,.035); border-radius: 11px; }
 .trade-metrics span { display: block; font-size: 10px; color: var(--muted); margin-bottom: 3px; }
@@ -321,6 +323,22 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .summary-card.positive strong { color: var(--green); }
 .summary-card.negative strong { color: var(--red); }
 .analytics-grid { margin-bottom: 16px; }
+.wr-period-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-bottom: 16px; }
+.wr-breakdown-card { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: rgba(255,255,255,.025); }
+.wr-breakdown-card.section-inner { margin-top: 20px; }
+.wr-breakdown-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
+.wr-breakdown-head h3 { margin-bottom: 4px; }
+.wr-breakdown-head p, .wr-breakdown-head > span { margin: 0; color: var(--muted); font-size: 11px; }
+.wr-table-wrap { overflow-x: auto; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; }
+.wr-table { width: 100%; min-width: 520px; border-collapse: collapse; }
+.wr-table th, .wr-table td { padding: 12px 10px; border-bottom: 1px solid var(--border); text-align: center; vertical-align: middle; }
+.wr-table thead th { color: var(--muted); font-size: 11px; background: rgba(255,255,255,.03); }
+.wr-table tbody tr:last-child th, .wr-table tbody tr:last-child td { border-bottom: 0; }
+.wr-table tbody th { text-align: left; }
+.asset-name { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 9px; border-radius: 999px; background: rgba(241,199,91,.1); color: var(--gold-2); font-size: 12px; }
+.wr-percent { display: block; font-size: 18px; font-weight: 850; color: var(--text); }
+.wr-percent.empty { color: var(--muted); }
+.wr-sample { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
 .chart-grid, .comparison-grid, .settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .chart-grid { margin-bottom: 16px; }
 .chart-card { padding: 17px; }
@@ -349,7 +367,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
   .site-header { align-items: flex-start; flex-direction: column; }
   .header-dashboard { min-width: 0; width: 100%; }
   .header-status { width: 100%; }
-  .field-grid.four { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .field-grid.four, .field-grid.five { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .trade-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
 }
 @media (max-width: 760px) {
@@ -358,7 +376,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
   .header-status div { border-right: 0; border-bottom: 1px solid var(--border); }
   .header-status div:last-child { border-bottom: 0; }
   .section-head.split, .upload-block { align-items: stretch; flex-direction: column; }
-  .field-grid.two, .field-grid.three, .field-grid.four, .account-selector, .chart-grid, .comparison-grid, .settings-grid { grid-template-columns: 1fr; }
+  .field-grid.two, .field-grid.three, .field-grid.four, .field-grid.five, .account-selector, .chart-grid, .comparison-grid, .settings-grid, .wr-period-grid { grid-template-columns: 1fr; }
   .calculation-strip, .trade-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .trade-review-grid { grid-template-columns: 1fr; }
   .check-grid { grid-template-columns: 1fr 1fr; }
