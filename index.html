@@ -248,12 +248,17 @@
 
         <form id="tradeForm" class="form-stack">
           <input id="tradeId" type="hidden" />
-          <div class="field-grid four">
+          <div class="field-grid five">
             <label class="form-field"><span>계좌</span><select id="tradeAccount"><option value="demo">데모</option><option value="live">실제</option></select></label>
             <label class="form-field"><span>거래일</span><input id="tradeDate" type="date" required /></label>
-            <label class="form-field"><span>종목</span><select id="tradeSymbol"><option value="GC">GC</option><option value="MGC">MGC</option><option value="CUSTOM">사용자 지정</option></select></label>
+            <label class="form-field"><span>자산</span><select id="tradeAsset"><option value="GOLD">금</option><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="NASDAQ">나스닥</option><option value="OIL">원유</option><option value="CUSTOM">직접 입력</option></select></label>
+            <label class="form-field"><span>종목</span><select id="tradeSymbol"><option value="GC">GC</option><option value="MGC">MGC</option><option value="BTC">BTC</option><option value="BTCUSDT">BTCUSDT</option><option value="ETH">ETH</option><option value="NQ">NQ</option><option value="MNQ">MNQ</option><option value="CL">CL</option><option value="MCL">MCL</option><option value="CUSTOM">사용자 지정</option></select></label>
             <label class="form-field"><span>방향</span><select id="tradeDirection"><option value="long">Long</option><option value="short">Short</option></select></label>
           </div>
+          <label class="form-field hidden" id="customAssetField">
+            <span>사용자 자산명</span>
+            <input id="customAssetName" type="text" maxlength="30" placeholder="예: SOL, 은, S&P500" />
+          </label>
 
           <div class="field-grid four">
             <label class="form-field"><span>진입 시간</span><input id="entryTime" type="time" /></label>
@@ -338,6 +343,7 @@
           <div><h2>거래 기록</h2><p>계좌·기간·결과별로 필터링할 수 있습니다.</p></div>
           <div class="filter-row">
             <select id="tradeAccountFilter"><option value="all">전체 계좌</option><option value="demo">데모</option><option value="live">실제</option></select>
+            <select id="tradeAssetFilter"><option value="all">전체 자산</option><option value="GOLD">금</option><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="NASDAQ">나스닥</option><option value="OIL">원유</option></select>
             <select id="tradeResultFilter"><option value="all">전체 결과</option><option value="win">수익</option><option value="loss">손실</option><option value="breakeven">본전</option></select>
             <input id="tradeSearch" type="search" placeholder="근거·복기·태그 검색" />
           </div>
@@ -354,6 +360,17 @@
         </div>
 
         <div id="dailyStats" class="summary-grid"></div>
+
+        <article class="wr-breakdown-card section-inner">
+          <div class="wr-breakdown-head">
+            <div>
+              <h3>일간 자산·계좌별 평균 WR</h3>
+              <p>WR = 수익 거래 수 ÷ 전체 거래 수 × 100</p>
+            </div>
+            <span id="dailyWrCaption"></span>
+          </div>
+          <div id="dailyWinRateBreakdown"></div>
+        </article>
 
         <form id="dailyReviewForm" class="form-stack section-inner">
           <div class="field-grid two">
@@ -382,6 +399,29 @@
 
         <div id="analyticsSummary" class="summary-grid analytics-grid"></div>
 
+        <div class="wr-period-grid">
+          <article class="wr-breakdown-card">
+            <div class="wr-breakdown-head">
+              <div>
+                <h3>주간 자산·계좌별 평균 WR</h3>
+                <p>오늘을 포함한 최근 7일</p>
+              </div>
+              <span id="weeklyWrCaption"></span>
+            </div>
+            <div id="weeklyWinRateBreakdown"></div>
+          </article>
+          <article class="wr-breakdown-card">
+            <div class="wr-breakdown-head">
+              <div>
+                <h3>월간 자산·계좌별 평균 WR</h3>
+                <p>현재 달의 1일부터 오늘까지</p>
+              </div>
+              <span id="monthlyWrCaption"></span>
+            </div>
+            <div id="monthlyWinRateBreakdown"></div>
+          </article>
+        </div>
+
         <div class="chart-grid">
           <article class="chart-card">
             <div class="chart-head"><h3>일별 순손익</h3><span id="pnlChartCaption"></span></div>
@@ -407,6 +447,7 @@
           <form id="contractSettingsForm" class="form-stack">
             <label class="form-field"><span>GC 계약 승수</span><input id="gcMultiplier" type="number" step="0.01" value="100" /></label>
             <label class="form-field"><span>MGC 계약 승수</span><input id="mgcMultiplier" type="number" step="0.01" value="10" /></label>
+            <label class="form-field"><span>BTC 계약 승수</span><input id="btcMultiplier" type="number" step="0.0001" value="1" /></label>
             <label class="form-field"><span>사용자 지정 계약 승수</span><input id="customMultiplier" type="number" step="0.01" value="1" /></label>
             <button class="button primary" type="submit">설정 저장</button>
           </form>
