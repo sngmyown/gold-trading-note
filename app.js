@@ -12,7 +12,7 @@ const DEFAULT_STATE = {
   trades: [],
   dailyReviews: {},
   strategyGoal: { text: "", color: "#f1c75b", updatedAt: null },
-  settings: { gcMultiplier: 100, mgcMultiplier: 10, customMultiplier: 1 },
+  settings: { gcMultiplier: 100, mgcMultiplier: 10, btcMultiplier: 1, customMultiplier: 1 },
   updatedAt: null
 };
 
@@ -41,7 +41,7 @@ function loadState() {
       settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) },
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(parsed.strategyGoal || {}) },
       analyses: parsed.analyses || {},
-      trades: Array.isArray(parsed.trades) ? parsed.trades : [],
+      trades: Array.isArray(parsed.trades) ? parsed.trades.map(normalizeTradeRecord) : [],
       dailyReviews: parsed.dailyReviews || {}
     };
   } catch (error) {
@@ -162,9 +162,77 @@ function splitTags(value) {
   return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+const STANDARD_ASSET_ORDER = ["GOLD", "BTC", "ETH", "NASDAQ", "OIL"];
+const STANDARD_ASSET_LABELS = {
+  GOLD: "금",
+  BTC: "BTC",
+  ETH: "ETH",
+  NASDAQ: "나스닥",
+  OIL: "원유",
+  OTHER: "기타"
+};
+
+function inferAssetFromSymbol(symbol) {
+  const normalized = String(symbol || "").trim().toUpperCase();
+  if (["GC", "MGC", "XAU", "XAUUSD"].includes(normalized)) return "GOLD";
+  if (normalized.startsWith("BTC")) return "BTC";
+  if (normalized.startsWith("ETH")) return "ETH";
+  if (["NQ", "MNQ", "NDX", "NASDAQ"].includes(normalized)) return "NASDAQ";
+  if (["CL", "MCL", "WTI", "OIL"].includes(normalized)) return "OIL";
+  return "OTHER";
+}
+
+function normalizeAssetKey(asset, customAssetName, symbol) {
+  const raw = String(asset || "").trim().toUpperCase();
+  const custom = String(customAssetName || "").trim();
+  if (raw && raw !== "CUSTOM") return raw;
+  if (custom) return custom.toUpperCase();
+  return inferAssetFromSymbol(symbol);
+}
+
+function normalizeTradeRecord(trade) {
+  const asset = normalizeAssetKey(trade?.asset, trade?.customAssetName, trade?.symbol);
+  return {
+    ...trade,
+    asset,
+    customAssetName: trade?.customAssetName || ""
+  };
+}
+
+function assetOfTrade(trade) {
+  return normalizeAssetKey(trade?.asset, trade?.customAssetName, trade?.symbol);
+}
+
+function assetLabel(asset) {
+  const key = String(asset || "OTHER").trim().toUpperCase();
+  return STANDARD_ASSET_LABELS[key] || key;
+}
+
+function updateAssetFieldVisibility(syncSymbol = false) {
+  const select = $("tradeAsset");
+  if (!select) return;
+  const asset = select.value;
+  $("customAssetField")?.classList.toggle("hidden", asset !== "CUSTOM");
+  if (syncSymbol) {
+    const symbolByAsset = { GOLD: "GC", BTC: "BTC", ETH: "ETH", NASDAQ: "NQ", OIL: "CL", CUSTOM: "CUSTOM" };
+    if ($("tradeSymbol") && symbolByAsset[asset]) $("tradeSymbol").value = symbolByAsset[asset];
+    updateTradeCalculations();
+  }
+}
+
+function syncAssetFromSymbol() {
+  const inferred = inferAssetFromSymbol($("tradeSymbol")?.value);
+  if (STANDARD_ASSET_ORDER.includes(inferred) && $("tradeAsset")) {
+    $("tradeAsset").value = inferred;
+    updateAssetFieldVisibility(false);
+  }
+}
+
 function getMultiplier(symbol) {
-  if (symbol === "GC") return Number(state.settings.gcMultiplier) || 100;
-  if (symbol === "MGC") return Number(state.settings.mgcMultiplier) || 10;
+  const normalized = String(symbol || "").toUpperCase();
+  if (normalized === "GC") return Number(state.settings.gcMultiplier) || 100;
+  if (normalized === "MGC") return Number(state.settings.mgcMultiplier) || 10;
+  if (normalized.startsWith("BTC")) return Number(state.settings.btcMultiplier) || 1;
   return Number(state.settings.customMultiplier) || 1;
 }
 
@@ -390,15 +458,20 @@ async function saveAnalysis(event) {
 function setupTradeForm() {
   $("tradeDate").value = localDateString();
   $("tradeAccount").value = state.activeAccount === "live" ? "live" : "demo";
+  $("tradeAsset").value = "GOLD";
   ["tradeSymbol", "tradeDirection", "tradeDate", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice"].forEach((id) => $(id).addEventListener("input", updateTradeCalculations));
+  $("tradeAsset").addEventListener("change", () => updateAssetFieldVisibility(true));
+  $("tradeSymbol").addEventListener("change", syncAssetFromSymbol);
   $("tradeForm").addEventListener("submit", saveTrade);
   $("resetTradeButton").addEventListener("click", resetTradeForm);
   $("tradeImages").addEventListener("change", (event) => addPendingImages(event.target.files, "trade"));
   $("changeAccountButton").addEventListener("click", () => document.querySelector(".tab[data-view='analysis']")?.click());
   $("reviewDepth").addEventListener("change", updateReviewDepth);
   $("tradeAccountFilter").addEventListener("change", renderTrades);
+  $("tradeAssetFilter").addEventListener("change", renderTrades);
   $("tradeResultFilter").addEventListener("change", renderTrades);
   $("tradeSearch").addEventListener("input", renderTrades);
+  updateAssetFieldVisibility(false);
   updateReviewDepth();
   updateTradeCalculations();
 }
@@ -456,6 +529,8 @@ async function saveTrade(event) {
   });
   trade.frameworkTags = splitTags($("frameworkTags").value);
   trade.timeframes = splitTags($("timeframes").value);
+  trade.customAssetName = $("customAssetName").value.trim();
+  trade.asset = normalizeAssetKey($("tradeAsset").value, trade.customAssetName, trade.symbol);
 
   if (existingIndex >= 0) state.trades[existingIndex] = trade;
   else state.trades.push(trade);
@@ -463,6 +538,7 @@ async function saveTrade(event) {
   resetTradeForm();
   renderTrades();
   renderDaily();
+  renderAnalytics();
   notify(existingIndex >= 0 ? "거래 기록을 수정했습니다." : "거래 기록을 저장했습니다.");
 }
 
@@ -471,6 +547,8 @@ function resetTradeForm() {
   $("tradeId").value = "";
   $("tradeDate").value = localDateString();
   $("tradeAccount").value = state.activeAccount === "live" ? "live" : "demo";
+  $("tradeAsset").value = "GOLD";
+  $("customAssetName").value = "";
   $("tradeSymbol").value = "GC";
   $("tradeDirection").value = "long";
   $("contracts").value = "1";
@@ -482,6 +560,7 @@ function resetTradeForm() {
   pendingTradeImages = [];
   currentTradeImageIds = [];
   renderPendingImages($("tradeImageList"), [], "trade");
+  updateAssetFieldVisibility(false);
   updateReviewDepth();
   updateTradeCalculations();
 }
@@ -497,6 +576,11 @@ async function editTrade(id) {
     const value = Array.isArray(trade[key]) ? trade[key].join(", ") : trade[key];
     input.value = value ?? "";
   });
+  const savedAsset = assetOfTrade(trade);
+  const isStandardAsset = STANDARD_ASSET_ORDER.includes(savedAsset);
+  $("tradeAsset").value = isStandardAsset ? savedAsset : "CUSTOM";
+  $("customAssetName").value = isStandardAsset ? "" : savedAsset;
+  updateAssetFieldVisibility(false);
   $("followedPlan").checked = Boolean(trade.followedPlan);
   $("ruleViolation").checked = Boolean(trade.ruleViolation);
   $("revengeTrade").checked = Boolean(trade.revengeTrade);
@@ -526,15 +610,18 @@ async function renderTrades() {
     $("tradeAccountFilter").value = state.activeAccount;
   }
   const accountFilter = $("tradeAccountFilter")?.value || (state.activeAccount === "all" ? "all" : state.activeAccount);
+  const assetFilter = $("tradeAssetFilter")?.value || "all";
   const resultFilter = $("tradeResultFilter")?.value || "all";
   const query = ($("tradeSearch")?.value || "").trim().toLowerCase();
 
   const trades = [...state.trades]
+    .map(normalizeTradeRecord)
     .filter((trade) => (accountFilter === "all" || trade.account === accountFilter))
+    .filter((trade) => (assetFilter === "all" || assetOfTrade(trade) === assetFilter))
     .filter((trade) => (resultFilter === "all" || resultOfTrade(trade) === resultFilter))
     .filter((trade) => {
       if (!query) return true;
-      return [trade.tradeReason, trade.tradeReview, trade.tradeStrengths, trade.tradeMistakes, trade.nextAction, trade.psychology, ...(trade.frameworkTags || [])].join(" ").toLowerCase().includes(query);
+      return [assetLabel(assetOfTrade(trade)), trade.symbol, trade.tradeReason, trade.tradeReview, trade.tradeStrengths, trade.tradeMistakes, trade.nextAction, trade.psychology, ...(trade.frameworkTags || [])].join(" ").toLowerCase().includes(query);
     })
     .sort((a, b) => `${b.date} ${b.entryTime || ""}`.localeCompare(`${a.date} ${a.entryTime || ""}`));
 
@@ -553,6 +640,7 @@ async function renderTrades() {
         <div class="trade-card-head">
           <div class="trade-card-title">
             <strong>${escapeHtml(trade.symbol)} · ${trade.direction === "long" ? "LONG" : "SHORT"}</strong>
+            <span class="badge asset">${escapeHtml(assetLabel(assetOfTrade(trade)))}</span>
             <span class="badge ${escapeHtml(trade.account)}">${trade.account === "demo" ? "DEMO" : "LIVE"}</span>
             <span class="badge ${result}">${result === "win" ? "수익" : result === "loss" ? "손실" : "본전"}</span>
             <span class="badge">${formatDate(trade.date)}</span>
@@ -625,16 +713,102 @@ function aggregateTrades(trades) {
   };
 }
 
+function getTradesBetween(start, end) {
+  return state.trades
+    .map(normalizeTradeRecord)
+    .filter((trade) => {
+      const tradeDate = new Date(`${trade.date}T00:00:00`);
+      return tradeDate >= start && tradeDate <= end;
+    });
+}
+
+function winRateSnapshot(trades) {
+  const stats = aggregateTrades(trades);
+  return {
+    count: stats.count,
+    wins: stats.wins,
+    winRate: stats.winRate
+  };
+}
+
+function winRateCell(trades) {
+  const snapshot = winRateSnapshot(trades);
+  if (!snapshot.count) {
+    return '<span class="wr-percent empty">-</span><small class="wr-sample">0회</small>';
+  }
+  return `<span class="wr-percent">${formatNumber(snapshot.winRate, 1)}%</span><small class="wr-sample">${snapshot.wins}승 / ${snapshot.count}회</small>`;
+}
+
+function orderedAssetsForTrades(trades) {
+  const present = new Set(trades.map(assetOfTrade));
+  const ordered = ["GOLD", "BTC"];
+  STANDARD_ASSET_ORDER.forEach((asset) => {
+    if (present.has(asset) && !ordered.includes(asset)) ordered.push(asset);
+  });
+  [...present]
+    .filter((asset) => !ordered.includes(asset))
+    .sort((a, b) => assetLabel(a).localeCompare(assetLabel(b), "ko"))
+    .forEach((asset) => ordered.push(asset));
+  return ordered;
+}
+
+function renderAccountAssetWinRate(container, trades) {
+  if (!container) return;
+  const normalizedTrades = trades.map(normalizeTradeRecord);
+  const assets = orderedAssetsForTrades(normalizedTrades);
+  const rows = assets.map((asset) => {
+    const assetTrades = normalizedTrades.filter((trade) => assetOfTrade(trade) === asset);
+    const demoTrades = assetTrades.filter((trade) => trade.account === "demo");
+    const liveTrades = assetTrades.filter((trade) => trade.account === "live");
+    return `<tr>
+      <th><span class="asset-name">${escapeHtml(assetLabel(asset))}</span></th>
+      <td>${winRateCell(demoTrades)}</td>
+      <td>${winRateCell(liveTrades)}</td>
+      <td>${winRateCell(assetTrades)}</td>
+    </tr>`;
+  }).join("");
+
+  container.innerHTML = `<div class="wr-table-wrap">
+    <table class="wr-table">
+      <thead><tr><th>자산</th><th>데모 계좌</th><th>실제 계좌</th><th>전체</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderPeriodWinRateBreakdowns() {
+  const today = new Date(`${localDateString()}T00:00:00`);
+  const end = new Date(today.getTime() + 86400000 - 1);
+  const weekStart = new Date(today.getTime() - 6 * 86400000);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  const weekTrades = getTradesBetween(weekStart, end);
+  const monthTrades = getTradesBetween(monthStart, end);
+
+  renderAccountAssetWinRate($("weeklyWinRateBreakdown"), weekTrades);
+  renderAccountAssetWinRate($("monthlyWinRateBreakdown"), monthTrades);
+
+  if ($("weeklyWrCaption")) {
+    $("weeklyWrCaption").textContent = `${localDateString(weekStart).slice(5)} ~ ${localDateString(today).slice(5)}`;
+  }
+  if ($("monthlyWrCaption")) {
+    $("monthlyWrCaption").textContent = `${today.getFullYear()}년 ${today.getMonth() + 1}월`;
+  }
+}
+
 function renderDaily() {
   const date = $("dailyDate")?.value || localDateString();
   const stats = aggregateTrades(tradesForDate(date));
   $("dailyStats").innerHTML = [
     ["총 거래", `${stats.count}회`, ""],
     ["수익 / 손실", `${stats.wins} / ${stats.losses}`, ""],
+    ["평균 WR", `${formatNumber(stats.winRate, 1)}%`, stats.winRate >= 50 ? "positive" : stats.count ? "negative" : ""],
     ["순손익", formatMoney(stats.netProfit), stats.netProfit >= 0 ? "positive" : "negative"],
     ["평균 R", `${formatNumber(stats.avgR, 2)}R`, stats.avgR >= 0 ? "positive" : "negative"],
     ["평균 보유", formatDuration(Math.round(stats.avgDuration)), ""]
   ].map(([label, value, cls]) => `<div class="summary-card ${cls}"><span>${label}</span><strong>${value}</strong></div>`).join("");
+  renderAccountAssetWinRate($("dailyWinRateBreakdown"), tradesForDate(date));
+  if ($("dailyWrCaption")) $("dailyWrCaption").textContent = formatDate(date);
   const review = state.dailyReviews[date] || {};
   $("dailyBest").value = review.best || "";
   $("dailyMistake").value = review.mistake || "";
@@ -693,7 +867,7 @@ function renderAnalytics() {
   const stats = aggregateTrades(trades);
   $("analyticsSummary").innerHTML = [
     ["총 거래", `${stats.count}회`, ""],
-    ["승률", `${formatNumber(stats.winRate,1)}%`, ""],
+    ["평균 WR", `${formatNumber(stats.winRate,1)}%`, ""],
     ["총이익", formatMoney(stats.grossProfit), "positive"],
     ["총손실", formatMoney(-stats.grossLoss), "negative"],
     ["순손익", formatMoney(stats.netProfit), stats.netProfit >= 0 ? "positive" : "negative"],
@@ -703,6 +877,7 @@ function renderAnalytics() {
     ["거래당 기대값", formatMoney(stats.expectancy), stats.expectancy >= 0 ? "positive" : "negative"],
     ["평균 보유", formatDuration(Math.round(stats.avgDuration)), ""]
   ].map(([label,value,cls]) => `<div class="summary-card ${cls}"><span>${label}</span><strong>${value}</strong></div>`).join("");
+  renderPeriodWinRateBreakdowns();
   renderDailyPnlChart(trades);
   renderEquityChart(trades);
   renderAccountComparison(trades);
@@ -901,6 +1076,7 @@ function closeImageViewer() {
 function setupSettings() {
   $("gcMultiplier").value = state.settings.gcMultiplier;
   $("mgcMultiplier").value = state.settings.mgcMultiplier;
+  $("btcMultiplier").value = state.settings.btcMultiplier;
   $("customMultiplier").value = state.settings.customMultiplier;
   $("contractSettingsForm").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -954,7 +1130,8 @@ async function importBackup(event) {
       ...cloneDefaultState(),
       ...payload.state,
       settings: { ...DEFAULT_STATE.settings, ...(payload.state.settings || {}) },
-      strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(payload.state.strategyGoal || {}) }
+      strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(payload.state.strategyGoal || {}) },
+      trades: Array.isArray(payload.state.trades) ? payload.state.trades.map(normalizeTradeRecord) : []
     };
     await clearImages();
     for (const image of payload.images) await putImage(image);
