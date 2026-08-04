@@ -284,6 +284,107 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .account-banner.live { background: rgba(140,101,27,.18); border-color: rgba(241,199,91,.45); }
 .account-banner.all { background: rgba(255,255,255,.04); }
 
+
+.market-session-card {
+  width: 100%;
+  padding: 15px 16px 16px;
+  border: 1px solid rgba(101,169,255,.22);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(101,169,255,.07), transparent 45%),
+    rgba(17,23,34,.92);
+  box-shadow: var(--shadow);
+}
+.market-session-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+.market-session-head > div:first-child > span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.market-session-head small { color: rgba(156,168,187,.72); font-size: 10px; }
+.market-session-clock { text-align: right; }
+.market-session-clock span { display: block; color: var(--muted); font-size: 10px; margin-bottom: 2px; }
+.market-session-clock strong { font-variant-numeric: tabular-nums; font-size: 15px; letter-spacing: .04em; }
+.market-session-current {
+  display: grid;
+  grid-template-columns: minmax(130px,.8fr) minmax(0,1.8fr);
+  gap: 12px;
+  align-items: center;
+  margin-top: 13px;
+  padding: 12px 13px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 13px;
+  background: rgba(4,7,12,.34);
+}
+.market-session-current span { display: block; color: var(--muted); font-size: 10px; margin-bottom: 3px; }
+.market-session-current strong { font-size: 16px; color: var(--gold-2); }
+.market-session-current p { margin: 0; color: var(--muted); font-size: 11px; text-align: right; line-height: 1.45; }
+.market-session-timeline {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 9px;
+  margin-top: 10px;
+}
+.market-session-box {
+  position: relative;
+  min-height: 118px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 13px;
+  background: rgba(255,255,255,.025);
+  isolation: isolate;
+}
+.market-session-box::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--session-progress,0%);
+  background: linear-gradient(180deg, transparent, var(--session-fill));
+  opacity: .34;
+  transition: height .7s linear;
+  z-index: -1;
+}
+.market-session-box.active {
+  border-color: var(--session-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--session-color) 15%, transparent);
+}
+.market-session-box.complete { opacity: .84; }
+.market-session-box.closed { opacity: .58; }
+.market-session-box-inner { padding: 12px; }
+.market-session-box-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.market-session-name { display: block; font-size: 14px; font-weight: 850; }
+.market-session-city { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; letter-spacing: .06em; }
+.market-session-status {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(0,0,0,.18);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.market-session-box.active .market-session-status { color: var(--session-color); border-color: var(--session-color); }
+.market-session-time { margin-top: 15px; }
+.market-session-time strong { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
+.market-session-time span { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+.market-session-progress-track { height: 5px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+.market-session-progress-bar { height: 100%; width: var(--session-progress,0%); border-radius: inherit; background: var(--session-color); transition: width .7s linear; }
+.market-session-progress-label { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; color: var(--muted); font-size: 9px; }
+.market-session-footer { display: grid; gap: 5px; margin-top: 10px; }
+.market-session-footer > span { color: var(--text); font-size: 10px; font-weight: 750; }
+.market-session-footer small { color: rgba(156,168,187,.7); font-size: 9px; line-height: 1.45; }
+
 .calculation-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
 .calculation-strip div { padding: 13px; border: 1px solid var(--border); border-radius: 13px; background: rgba(255,255,255,.035); }
 .calculation-strip span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
@@ -367,6 +468,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
   .site-header { align-items: flex-start; flex-direction: column; }
   .header-dashboard { min-width: 0; width: 100%; }
   .header-status { width: 100%; }
+  .market-session-timeline { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .field-grid.four, .field-grid.five { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .trade-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
 }
@@ -375,6 +477,10 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
   .header-status { grid-template-columns: 1fr; }
   .header-status div { border-right: 0; border-bottom: 1px solid var(--border); }
   .header-status div:last-child { border-bottom: 0; }
+  .market-session-current { grid-template-columns: 1fr; }
+  .market-session-current p { text-align: left; }
+  .market-session-timeline { grid-template-columns: 1fr; }
+  .market-session-box { min-height: 108px; }
   .section-head.split, .upload-block { align-items: stretch; flex-direction: column; }
   .field-grid.two, .field-grid.three, .field-grid.four, .field-grid.five, .account-selector, .chart-grid, .comparison-grid, .settings-grid, .wr-period-grid { grid-template-columns: 1fr; }
   .calculation-strip, .trade-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
