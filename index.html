@@ -76,6 +76,34 @@
           </div>
         </form>
       </section>
+
+      <section class="market-session-card" aria-labelledby="marketSessionTitle">
+        <div class="market-session-head">
+          <div>
+            <span id="marketSessionTitle">글로벌 거래 세션</span>
+            <small>서머타임 자동 반영 · 한국시간 기준</small>
+          </div>
+          <div class="market-session-clock">
+            <span>KST</span>
+            <strong id="marketSessionClock">--:--:--</strong>
+          </div>
+        </div>
+
+        <div class="market-session-current">
+          <div>
+            <span>현재 시장</span>
+            <strong id="currentMarketSession">계산 중</strong>
+          </div>
+          <p id="currentMarketSessionDetail">세션 시간을 확인하고 있습니다.</p>
+        </div>
+
+        <div id="marketSessionTimeline" class="market-session-timeline" aria-live="polite"></div>
+
+        <div class="market-session-footer">
+          <span id="marketSessionDstStatus">유럽·뉴욕 서머타임 확인 중</span>
+          <small>아시아 09:00–18:00 JST · 유럽 08:00–17:00 London · 뉴욕 08:00–17:00 New York 기준의 유동성 세션입니다. CME 금 선물 자체는 일요일부터 금요일까지 거의 23시간 거래됩니다.</small>
+        </div>
+      </section>
     </div>
   </header>
 
