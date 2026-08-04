@@ -5,6 +5,14 @@ const DB_NAME = "goldTradingReviewImagesV1";
 const DB_STORE = "images";
 const DB_VERSION = 1;
 
+const MARKET_TIME_ZONE = "Asia/Seoul";
+const MARKET_SESSION_CYCLE_START_HOUR = 9;
+const MARKET_SESSIONS = [
+  { id: "asia", name: "아시아장", city: "TOKYO", timeZone: "Asia/Tokyo", openHour: 9, closeHour: 18, color: "#65a9ff", fill: "rgba(101,169,255,.72)" },
+  { id: "europe", name: "유럽장", city: "LONDON", timeZone: "Europe/London", openHour: 8, closeHour: 17, color: "#44d48b", fill: "rgba(68,212,139,.72)" },
+  { id: "newyork", name: "뉴욕장", city: "NEW YORK", timeZone: "America/New_York", openHour: 8, closeHour: 17, color: "#ff9d57", fill: "rgba(255,157,87,.72)" }
+];
+
 const DEFAULT_STATE = {
   version: 1,
   activeAccount: "all",
@@ -22,6 +30,7 @@ let pendingAnalysisImages = [];
 let pendingTradeImages = [];
 let currentTradeImageIds = [];
 let confirmResolver = null;
+let marketSessionTimer = null;
 
 const $ = (id) => document.getElementById(id);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -281,6 +290,221 @@ function resultOfTrade(trade) {
   if (trade.pnl > 0.005) return "win";
   if (trade.pnl < -0.005) return "loss";
   return "breakeven";
+}
+
+
+function timeZoneParts(date, timeZone, includeName = false) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+    ...(includeName ? { timeZoneName: "short" } : {})
+  });
+
+  const parts = {};
+  formatter.formatToParts(date).forEach((part) => {
+    if (part.type !== "literal") parts[part.type] = part.value;
+  });
+
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+    timeZoneName: parts.timeZoneName || ""
+  };
+}
+
+function timeZoneOffsetMinutes(date, timeZone) {
+  const parts = timeZoneParts(date, timeZone);
+  const representedUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return Math.round((representedUtc - date.getTime()) / 60000);
+}
+
+function zonedDateTimeToUtc(year, month, day, hour, minute, timeZone) {
+  let guess = Date.UTC(year, month - 1, day, hour, minute, 0);
+
+  for (let index = 0; index < 3; index += 1) {
+    const offset = timeZoneOffsetMinutes(new Date(guess), timeZone);
+    const corrected = Date.UTC(year, month - 1, day, hour, minute, 0) - offset * 60000;
+    if (corrected === guess) break;
+    guess = corrected;
+  }
+
+  return new Date(guess);
+}
+
+function addCalendarDays(parts, days) {
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
+}
+
+function isWeekdayDate(parts) {
+  const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  return weekday >= 1 && weekday <= 5;
+}
+
+function marketCycleDate(now = new Date()) {
+  const kst = timeZoneParts(now, MARKET_TIME_ZONE);
+  const base = { year: kst.year, month: kst.month, day: kst.day };
+  return kst.hour >= MARKET_SESSION_CYCLE_START_HOUR ? base : addCalendarDays(base, -1);
+}
+
+function sessionWindow(session, cycleDate) {
+  return {
+    start: zonedDateTimeToUtc(cycleDate.year, cycleDate.month, cycleDate.day, session.openHour, 0, session.timeZone),
+    end: zonedDateTimeToUtc(cycleDate.year, cycleDate.month, cycleDate.day, session.closeHour, 0, session.timeZone)
+  };
+}
+
+function sessionState(session, now, cycleDate) {
+  const weekday = isWeekdayDate(cycleDate);
+  const window = sessionWindow(session, cycleDate);
+  let status = "upcoming";
+  let progress = 0;
+
+  if (!weekday) {
+    status = "closed";
+  } else if (now >= window.end) {
+    status = "complete";
+    progress = 100;
+  } else if (now >= window.start) {
+    status = "active";
+    progress = ((now - window.start) / (window.end - window.start)) * 100;
+  }
+
+  return { ...session, ...window, status, progress: Math.max(0, Math.min(100, progress)) };
+}
+
+function formatClock(date, timeZone, seconds = false) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(seconds ? { second: "2-digit" } : {}),
+    hourCycle: "h23"
+  }).format(date);
+}
+
+function formatSessionRange(start, end) {
+  const startParts = timeZoneParts(start, MARKET_TIME_ZONE);
+  const endParts = timeZoneParts(end, MARKET_TIME_ZONE);
+  const rollsToNextDay = startParts.year !== endParts.year || startParts.month !== endParts.month || startParts.day !== endParts.day;
+  return `${formatClock(start, MARKET_TIME_ZONE)}–${formatClock(end, MARKET_TIME_ZONE)}${rollsToNextDay ? "(+1)" : ""}`;
+}
+
+function formatRemaining(milliseconds) {
+  const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (days) parts.push(`${days}일`);
+  if (hours) parts.push(`${hours}시간`);
+  parts.push(`${minutes}분`);
+  return parts.join(" ");
+}
+
+function nextMarketSessionStart(now, cycleDate) {
+  const candidates = [];
+
+  for (let dayOffset = 0; dayOffset <= 8; dayOffset += 1) {
+    const date = addCalendarDays(cycleDate, dayOffset);
+    if (!isWeekdayDate(date)) continue;
+
+    MARKET_SESSIONS.forEach((session) => {
+      const start = sessionWindow(session, date).start;
+      if (start > now) candidates.push({ session, start });
+    });
+  }
+
+  return candidates.sort((a, b) => a.start - b.start)[0] || null;
+}
+
+function daylightLabel(session, atDate) {
+  const offset = timeZoneOffsetMinutes(atDate, session.timeZone);
+  if (session.id === "europe") return offset === 60 ? "서머타임(BST)" : "윈터타임(GMT)";
+  if (session.id === "newyork") return offset === -240 ? "서머타임(EDT)" : "윈터타임(EST)";
+  return "고정시간(JST)";
+}
+
+function sessionStatusLabel(status) {
+  if (status === "active") return "진행 중";
+  if (status === "complete") return "종료";
+  if (status === "closed") return "주말 휴장";
+  return "개장 전";
+}
+
+function renderMarketSessions(now = new Date()) {
+  const timeline = $("marketSessionTimeline");
+  if (!timeline) return;
+
+  const cycleDate = marketCycleDate(now);
+  const sessions = MARKET_SESSIONS.map((session) => sessionState(session, now, cycleDate));
+  const active = sessions.filter((session) => session.status === "active");
+  const next = nextMarketSessionStart(now, cycleDate);
+
+  $("marketSessionClock").textContent = formatClock(now, MARKET_TIME_ZONE, true);
+
+  if (active.length) {
+    $("currentMarketSession").textContent = active.length > 1
+      ? `${active.map((session) => session.name).join(" · ")} 겹침`
+      : active[0].name;
+    $("currentMarketSessionDetail").textContent = active
+      .map((session) => `${session.name} 종료까지 ${formatRemaining(session.end - now)}`)
+      .join(" · ");
+  } else if (next) {
+    const weekend = !isWeekdayDate(cycleDate);
+    $("currentMarketSession").textContent = weekend ? "주말 휴장" : "세션 전환 구간";
+    $("currentMarketSessionDetail").textContent = `다음 ${next.session.name} 개장까지 ${formatRemaining(next.start - now)}`;
+  } else {
+    $("currentMarketSession").textContent = "주요 세션 종료";
+    $("currentMarketSessionDetail").textContent = "다음 거래 세션을 계산하지 못했습니다.";
+  }
+
+  timeline.innerHTML = sessions.map((session) => {
+    const localName = timeZoneParts(session.start, session.timeZone, true).timeZoneName;
+    const progress = session.progress.toFixed(1);
+    return `
+      <article class="market-session-box ${session.status}" style="--session-color:${session.color};--session-fill:${session.fill};--session-progress:${progress}%">
+        <div class="market-session-box-inner">
+          <div class="market-session-box-head">
+            <div>
+              <span class="market-session-name">${session.name}</span>
+              <span class="market-session-city">${session.city} · ${localName}</span>
+            </div>
+            <span class="market-session-status">${sessionStatusLabel(session.status)}</span>
+          </div>
+          <div class="market-session-time">
+            <strong>${formatSessionRange(session.start, session.end)} KST</strong>
+            <span>현지 ${String(session.openHour).padStart(2, "0")}:00–${String(session.closeHour).padStart(2, "0")}:00 · ${daylightLabel(session, session.start)}</span>
+          </div>
+          <div class="market-session-progress-track"><div class="market-session-progress-bar"></div></div>
+          <div class="market-session-progress-label"><span>진행률</span><strong>${session.status === "closed" ? "휴장" : `${Math.round(session.progress)}%`}</strong></div>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  const europe = sessions.find((session) => session.id === "europe");
+  const newyork = sessions.find((session) => session.id === "newyork");
+  $("marketSessionDstStatus").textContent = `유럽 ${daylightLabel(europe, europe.start)} · 뉴욕 ${daylightLabel(newyork, newyork.start)} · 자동 적용`;
+}
+
+function setupMarketSessions() {
+  renderMarketSessions();
+  if (marketSessionTimer) clearInterval(marketSessionTimer);
+  marketSessionTimer = setInterval(() => renderMarketSessions(), 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) renderMarketSessions();
+  });
 }
 
 function setupTabs() {
@@ -1196,6 +1420,7 @@ function checkStorageSupport() {
 async function init() {
   setupTabs();
   setupStrategyGoal();
+  setupMarketSessions();
   setupAnalysis();
   setupTradeForm();
   setupDaily();
