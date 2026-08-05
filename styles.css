@@ -232,6 +232,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .field-grid.five { grid-template-columns: repeat(5, minmax(0,1fr)); }
 .form-field { display: grid; gap: 7px; }
 .form-field > span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.field-hint { margin-left: 5px; color: var(--gold); font-size: 10px; font-weight: 700; }
 .details-panel { border: 1px solid var(--border); border-radius: 15px; background: rgba(255,255,255,.025); overflow: hidden; }
 .details-panel summary { cursor: pointer; padding: 14px 16px; font-weight: 800; color: var(--gold-2); }
 .details-content { padding: 0 16px 16px; display: grid; gap: 14px; }
@@ -406,7 +407,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .badge.demo { color: var(--blue); }
 .badge.live { color: var(--gold); }
 .badge.asset { color: var(--text); background: rgba(255,255,255,.06); }
-.trade-metrics { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 9px; margin-bottom: 13px; }
+.trade-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(125px,1fr)); gap: 9px; margin-bottom: 13px; }
 .trade-metrics div { padding: 10px; background: rgba(255,255,255,.035); border-radius: 11px; }
 .trade-metrics span { display: block; font-size: 10px; color: var(--muted); margin-bottom: 3px; }
 .trade-review-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
