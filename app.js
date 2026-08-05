@@ -155,7 +155,7 @@ function formatNumber(value, digits = 2) {
 function formatMoney(value) {
   const number = Number(value) || 0;
   const sign = number > 0 ? "+" : "";
-  return `${sign}$${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)}`;
+  return `${sign}$${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(number)}`;
 }
 
 function escapeHtml(value) {
@@ -880,6 +880,7 @@ async function renderTrades() {
           <div><span>계획 손익비</span><strong>${trade.plannedRR == null ? "-" : `1:${formatNumber(trade.plannedRR,2)}`}</strong></div>
           <div><span>보유 시간</span><strong>${formatDuration(trade.durationMinutes)}</strong></div>
           <div><span>진입→청산</span><strong>${formatNumber(trade.entryPrice)} → ${formatNumber(trade.exitPrice)}</strong></div>
+          <div><span>계약 수</span><strong>${formatNumber(trade.contracts, 3)}</strong></div>
           <div><span>복기 깊이</span><strong>${trade.reviewDepth === "deep" ? "심층" : trade.reviewDepth === "quick" ? "간단" : "정상"}</strong></div>
         </div>
         <div class="trade-review-grid">
