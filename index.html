@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="금 선물 매매 복기 대시보드" />
   <title>Gold Futures Trading Review</title>
-  <link rel="stylesheet" href="styles.css?v=9.1.0" />
-  <script src="app.js?v=9.1.0" defer></script>
+  <link rel="stylesheet" href="styles.css?v=10.0.0" />
+  <script src="app.js?v=10.0.0" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -73,6 +73,28 @@
             <button class="button primary" type="submit">목표 저장</button>
             <button id="cancelStrategyGoalButton" class="button ghost" type="button">취소</button>
             <button id="clearStrategyGoalButton" class="button danger" type="button">목표 삭제</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="trading-principles-card" aria-labelledby="tradingPrinciplesTitle">
+        <div class="trading-principles-head">
+          <div>
+            <span class="trading-principles-kicker">TRADING PRINCIPLES · 7 CORE RULES</span>
+            <strong id="tradingPrinciplesTitle">매매 원칙 7</strong>
+            <small>분석부터 실행까지 같은 구조 언어를 유지하기 위한 핵심 기준</small>
+          </div>
+          <button id="editTradingPrinciplesButton" class="trading-principles-edit" type="button">원칙 편집</button>
+        </div>
+
+        <ol id="tradingPrinciplesList" class="trading-principles-list" aria-label="매매 원칙 7가지"></ol>
+
+        <form id="tradingPrinciplesForm" class="trading-principles-editor hidden">
+          <div id="tradingPrinciplesEditorFields" class="trading-principles-editor-fields"></div>
+          <div class="trading-principles-actions">
+            <button class="button primary" type="submit">원칙 저장</button>
+            <button id="cancelTradingPrinciplesButton" class="button ghost" type="button">취소</button>
+            <button id="resetTradingPrinciplesButton" class="button danger" type="button">기본 7원칙 복원</button>
           </div>
         </form>
       </section>
