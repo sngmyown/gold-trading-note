@@ -13,6 +13,20 @@ const MARKET_SESSIONS = [
   { id: "newyork", name: "뉴욕장", city: "NEW YORK", timeZone: "America/New_York", openHour: 8, closeHour: 17, color: "#ff9d57", fill: "rgba(255,157,87,.72)" }
 ];
 
+const CAPITAL_LEVEL_STREAK_TARGET = 20;
+const CAPITAL_LEVELS = [
+  { level: 1, amount: 100000, multiplier: 1, rule: "START" },
+  { level: 2, amount: 200000, multiplier: 2, rule: "2×" },
+  { level: 3, amount: 400000, multiplier: 4, rule: "2×" },
+  { level: 4, amount: 800000, multiplier: 8, rule: "2×" },
+  { level: 5, amount: 1600000, multiplier: 16, rule: "2×" },
+  { level: 6, amount: 2400000, multiplier: 24, rule: "1.5×" },
+  { level: 7, amount: 3600000, multiplier: 36, rule: "1.5×" },
+  { level: 8, amount: 5400000, multiplier: 54, rule: "1.5×" },
+  { level: 9, amount: 8100000, multiplier: 81, rule: "1.5×" },
+  { level: 10, amount: 12150000, multiplier: 121.5, rule: "1.5× · 1000만원대" }
+];
+
 const DEFAULT_STATE = {
   version: 1,
   activeAccount: "all",
@@ -20,6 +34,7 @@ const DEFAULT_STATE = {
   trades: [],
   dailyReviews: {},
   strategyGoal: { text: "", color: "#f1c75b", updatedAt: null },
+  levelSystem: { unlockedLevel: 1, lastUnlockedAt: null },
   settings: { gcMultiplier: 100, mgcMultiplier: 10, btcMultiplier: 1, customMultiplier: 1 },
   updatedAt: null
 };
@@ -50,6 +65,7 @@ function loadState() {
       ...parsed,
       settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) },
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(parsed.strategyGoal || {}) },
+      levelSystem: { ...DEFAULT_STATE.levelSystem, ...(parsed.levelSystem || {}) },
       analyses: parsed.analyses || {},
       trades: Array.isArray(parsed.trades) ? parsed.trades.map(normalizeTradeRecord) : [],
       dailyReviews: parsed.dailyReviews || {}
@@ -157,6 +173,10 @@ function formatMoney(value) {
   const number = Number(value) || 0;
   const sign = number > 0 ? "+" : "";
   return `${sign}$${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(number)}`;
+}
+
+function formatKrw(value) {
+  return `₩${new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(Number(value) || 0)}`;
 }
 
 function escapeHtml(value) {
@@ -534,6 +554,7 @@ function updateHeader() {
   $("analysisStatus").style.color = state.analyses[today] ? "var(--green)" : "var(--orange)";
   $("activeAccountLabel").textContent = state.activeAccount === "demo" ? "데모" : state.activeAccount === "live" ? "실제" : "전체";
   renderStrategyGoal();
+  renderLevelSystem();
 }
 
 function validStrategyGoalColor(value) {
@@ -612,6 +633,112 @@ function setupStrategyGoal() {
   });
 
   renderStrategyGoal();
+}
+
+function levelEligibleTrades() {
+  return [...state.trades]
+    .map(normalizeTradeRecord)
+    .filter((trade) => trade.account === "live")
+    .filter((trade) => assetOfTrade(trade) === "GOLD")
+    .filter((trade) => Boolean(trade.date))
+    .sort((a, b) => `${a.date} ${a.entryTime || ""}`.localeCompare(`${b.date} ${b.entryTime || ""}`));
+}
+
+function calculateLevelStreakMilestones(days) {
+  let completedBlocks = 0;
+  let running = 0;
+  let currentStreak = 0;
+  let longestStreak = 0;
+
+  days.forEach((day) => {
+    if (day.netPnl > 0) {
+      running += 1;
+      longestStreak = Math.max(longestStreak, running);
+    } else {
+      completedBlocks += Math.floor(running / CAPITAL_LEVEL_STREAK_TARGET);
+      running = 0;
+    }
+  });
+
+  completedBlocks += Math.floor(running / CAPITAL_LEVEL_STREAK_TARGET);
+  if (days.length && days.at(-1).netPnl > 0) currentStreak = running;
+
+  return {
+    completedBlocks,
+    currentStreak,
+    currentProgress: currentStreak % CAPITAL_LEVEL_STREAK_TARGET,
+    longestStreak
+  };
+}
+
+function levelSystemMetrics() {
+  const days = buildDailyTradingPerformance(levelEligibleTrades());
+  const milestones = calculateLevelStreakMilestones(days);
+  const historicalLevel = Math.min(CAPITAL_LEVELS.length, 1 + milestones.completedBlocks);
+  const storedLevel = Math.max(1, Math.min(CAPITAL_LEVELS.length, Number(state.levelSystem?.unlockedLevel) || 1));
+  const unlockedLevel = Math.max(storedLevel, historicalLevel);
+  const current = CAPITAL_LEVELS[unlockedLevel - 1];
+  const next = CAPITAL_LEVELS[unlockedLevel] || null;
+
+  return { days, ...milestones, historicalLevel, unlockedLevel, current, next };
+}
+
+function syncLevelSystemState() {
+  const metrics = levelSystemMetrics();
+  const storedLevel = Math.max(1, Number(state.levelSystem?.unlockedLevel) || 1);
+  if (metrics.historicalLevel <= storedLevel) return false;
+
+  state.levelSystem = {
+    ...DEFAULT_STATE.levelSystem,
+    ...(state.levelSystem || {}),
+    unlockedLevel: metrics.historicalLevel,
+    lastUnlockedAt: new Date().toISOString()
+  };
+  return true;
+}
+
+function renderLevelSystem() {
+  if (!$("capitalLevelBadge")) return;
+  const metrics = levelSystemMetrics();
+  const atMax = !metrics.next;
+  const progress = atMax ? CAPITAL_LEVEL_STREAK_TARGET : metrics.currentProgress;
+  const progressPercent = atMax ? 100 : Math.min(100, progress / CAPITAL_LEVEL_STREAK_TARGET * 100);
+
+  $("capitalLevelBadge").textContent = `LV.${metrics.unlockedLevel}`;
+  $("capitalCurrentAmount").textContent = formatKrw(metrics.current.amount);
+  $("capitalCurrentRule").textContent = `${metrics.current.rule} · 시작금 대비 ${formatNumber(metrics.current.multiplier, 1)}×`;
+
+  if (metrics.next) {
+    $("capitalNextAmount").textContent = formatKrw(metrics.next.amount);
+    $("capitalNextLevel").textContent = `LV.${metrics.next.level} · ${metrics.next.rule}`;
+    $("capitalStreakProgress").textContent = `${progress} / ${CAPITAL_LEVEL_STREAK_TARGET}일`;
+    const remaining = CAPITAL_LEVEL_STREAK_TARGET - progress;
+    $("capitalStreakStatus").textContent = metrics.currentStreak
+      ? `현재 ${metrics.currentStreak}일 연속 수익 · ${remaining}일 더 유지하면 다음 단계 해제`
+      : `다음 단계까지 ${CAPITAL_LEVEL_STREAK_TARGET}일 연속 수익 마감이 필요합니다.`;
+  } else {
+    $("capitalNextAmount").textContent = "1000만원대 목표 달성";
+    $("capitalNextLevel").textContent = "다음 목표는 별도 설계";
+    $("capitalStreakProgress").textContent = "MAX LEVEL";
+    $("capitalStreakStatus").textContent = "현재 레벨업 계획의 최종 단계가 잠금 해제되었습니다.";
+  }
+
+  $("capitalStreakProgressBar").style.width = `${progressPercent}%`;
+  $("capitalUnlockSummary").textContent = `${metrics.unlockedLevel} / ${CAPITAL_LEVELS.length} 단계 해제 · 최장 ${metrics.longestStreak}일`;
+
+  const rail = $("capitalLevelRail");
+  rail.innerHTML = CAPITAL_LEVELS.map((item) => {
+    const unlocked = item.level <= metrics.unlockedLevel;
+    const active = item.level === metrics.unlockedLevel;
+    const status = active ? "ACTIVE" : unlocked ? "UNLOCKED" : "LOCKED";
+    return `
+      <article class="level-node ${unlocked ? "unlocked" : "locked"} ${active ? "active" : ""}">
+        <div class="level-node-top"><span>LV.${item.level}</span><b>${status}</b></div>
+        <strong>${escapeHtml(formatKrw(item.amount))}</strong>
+        <small>${item.rule}${item.level === CAPITAL_LEVELS.length ? " · TARGET" : ""}</small>
+      </article>
+    `;
+  }).join("");
 }
 
 function setActiveAccount(account, switchView = true) {
@@ -759,6 +886,7 @@ async function saveTrade(event) {
 
   if (existingIndex >= 0) state.trades[existingIndex] = trade;
   else state.trades.push(trade);
+  syncLevelSystemState();
   saveState();
   resetTradeForm();
   renderTrades();
@@ -1822,8 +1950,10 @@ async function importBackup(event) {
       ...payload.state,
       settings: { ...DEFAULT_STATE.settings, ...(payload.state.settings || {}) },
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(payload.state.strategyGoal || {}) },
+      levelSystem: { ...DEFAULT_STATE.levelSystem, ...(payload.state.levelSystem || {}) },
       trades: Array.isArray(payload.state.trades) ? payload.state.trades.map(normalizeTradeRecord) : []
     };
+    syncLevelSystemState();
     await clearImages();
     for (const image of payload.images) await putImage(image);
     saveState();
@@ -1895,6 +2025,10 @@ async function init() {
   setupSettings();
   setupModals();
   checkStorageSupport();
+  if (syncLevelSystemState()) {
+    state.updatedAt = new Date().toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
   updateHeader();
   renderAccountBanner();
   await renderTrades();
