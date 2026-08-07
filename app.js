@@ -51,6 +51,55 @@ let calendarViewDate = new Date(new Date().getFullYear(), new Date().getMonth(),
 const $ = (id) => document.getElementById(id);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+function showRuntimeError(context, error) {
+  const message = error instanceof Error ? error.message : String(error || "알 수 없는 오류");
+  console.error(`[Gold Review] ${context}`, error);
+  const warning = document.getElementById("storageWarning");
+  if (!warning) return;
+  warning.textContent = `대시보드 일부 기능 오류 (${context}): ${message}`;
+  warning.classList.remove("hidden");
+  warning.dataset.runtimeError = "true";
+}
+
+function safeRun(context, task) {
+  try {
+    return task();
+  } catch (error) {
+    showRuntimeError(context, error);
+    return null;
+  }
+}
+
+async function safeRunAsync(context, task) {
+  try {
+    return await task();
+  } catch (error) {
+    showRuntimeError(context, error);
+    return null;
+  }
+}
+
+window.addEventListener("error", (event) => {
+  showRuntimeError("JavaScript", event.error || event.message);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  showRuntimeError("비동기 처리", event.reason);
+});
+
+function validateCriticalDom() {
+  const criticalIds = [
+    "todayLabel", "analysisStatus", "activeAccountLabel",
+    "analysisView", "tradesView", "dailyView", "analyticsView", "settingsView",
+    "analysisDate", "analysisForm", "tradeForm", "dailyDate", "dailyReviewForm",
+    "analyticsPeriod", "analyticsAccount", "storageWarning"
+  ];
+  const missing = criticalIds.filter((id) => !document.getElementById(id));
+  if (missing.length) {
+    throw new Error(`index.html과 app.js 버전 불일치: ${missing.join(", ")}`);
+  }
+}
+
 function cloneDefaultState() {
   return JSON.parse(JSON.stringify(DEFAULT_STATE));
 }
@@ -181,11 +230,11 @@ function formatKrw(value) {
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function splitTags(value) {
@@ -661,7 +710,7 @@ function calculateLevelStreakMilestones(days) {
   });
 
   completedBlocks += Math.floor(running / CAPITAL_LEVEL_STREAK_TARGET);
-  if (days.length && days.at(-1).netPnl > 0) currentStreak = running;
+  if (days.length && days[days.length - 1].netPnl > 0) currentStreak = running;
 
   return {
     completedBlocks,
@@ -1333,7 +1382,7 @@ function calculateWinningStreaks(days) {
     }
   });
 
-  if (days.length && days.at(-1).netPnl > 0) {
+  if (days.length && days[days.length - 1].netPnl > 0) {
     current = { ...running };
   }
 
@@ -1540,7 +1589,7 @@ function renderEquityChart(trades) {
     return;
   }
 
-  caption.textContent = `${points.length}거래일 · ${trades.length}회 매매 · 최종 ${formatMoney(points.at(-1).cumulative)}`;
+  caption.textContent = `${points.length}거래일 · ${trades.length}회 매매 · 최종 ${formatMoney(points[points.length - 1].cumulative)}`;
 
   const width = 980;
   const height = 390;
@@ -1574,7 +1623,7 @@ function renderEquityChart(trades) {
   const linePath = coordinates
     .map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
     .join(" ");
-  const areaPath = `${linePath} L${coordinates.at(-1).x.toFixed(2)},${zeroY.toFixed(2)} L${coordinates[0].x.toFixed(2)},${zeroY.toFixed(2)} Z`;
+  const areaPath = `${linePath} L${coordinates[coordinates.length - 1].x.toFixed(2)},${zeroY.toFixed(2)} L${coordinates[0].x.toFixed(2)},${zeroY.toFixed(2)} Z`;
 
   const yGrid = yTicks.map((tick) => `
     <g>
@@ -2015,26 +2064,34 @@ function checkStorageSupport() {
 }
 
 async function init() {
-  setupTabs();
-  setupStrategyGoal();
-  setupMarketSessions();
-  setupAnalysis();
-  setupTradeForm();
-  setupDaily();
-  setupAnalytics();
-  setupSettings();
-  setupModals();
-  checkStorageSupport();
-  if (syncLevelSystemState()) {
-    state.updatedAt = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-  updateHeader();
-  renderAccountBanner();
-  await renderTrades();
-  renderDaily();
-  renderAnalytics();
-  await renderDataStatus();
+  safeRun("HTML 연결 검사", validateCriticalDom);
+
+  safeRun("탭 초기화", setupTabs);
+  safeRun("전략 목표 초기화", setupStrategyGoal);
+  safeRun("시장 세션 초기화", setupMarketSessions);
+  safeRun("금 분석 초기화", setupAnalysis);
+  safeRun("거래 기록 초기화", setupTradeForm);
+  safeRun("일간 마감 초기화", setupDaily);
+  safeRun("통계 초기화", setupAnalytics);
+  safeRun("설정·백업 초기화", setupSettings);
+  safeRun("모달 초기화", setupModals);
+  safeRun("저장소 지원 확인", checkStorageSupport);
+
+  safeRun("레벨 시스템 동기화", () => {
+    if (syncLevelSystemState()) {
+      state.updatedAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+  });
+
+  safeRun("상단 상태 렌더링", updateHeader);
+  safeRun("계좌 배너 렌더링", renderAccountBanner);
+  await safeRunAsync("거래 목록 렌더링", renderTrades);
+  safeRun("일간 마감 렌더링", renderDaily);
+  safeRun("통계 렌더링", renderAnalytics);
+  await safeRunAsync("데이터 상태 렌더링", renderDataStatus);
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  init().catch((error) => showRuntimeError("초기화", error));
+});
