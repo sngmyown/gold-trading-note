@@ -427,6 +427,59 @@
 
         <div id="analyticsSummary" class="summary-grid analytics-grid"></div>
 
+        <section class="streak-calendar-card">
+          <div class="streak-calendar-top">
+            <div>
+              <p class="eyebrow">WINNING STREAK</p>
+              <h3>연속 수익 거래일</h3>
+              <p>수익으로 마감한 거래일이 얼마나 이어지고 있는지 월간 캘린더로 추적합니다.</p>
+            </div>
+            <div class="calendar-controls" aria-label="캘린더 월 이동">
+              <button id="calendarPrevMonth" class="button ghost calendar-nav-button" type="button" aria-label="이전 달">←</button>
+              <strong id="calendarMonthLabel">-</strong>
+              <button id="calendarNextMonth" class="button ghost calendar-nav-button" type="button" aria-label="다음 달">→</button>
+              <button id="calendarTodayButton" class="button ghost calendar-today-button" type="button">이번 달</button>
+            </div>
+          </div>
+
+          <div class="streak-hero-grid">
+            <article class="streak-hero current">
+              <span>현재 Winning Streak</span>
+              <strong id="currentWinningStreak">0일</strong>
+              <small id="currentWinningStreakRange">아직 수익 거래일이 없습니다.</small>
+            </article>
+            <article class="streak-hero best">
+              <span>최장 Winning Streak</span>
+              <strong id="longestWinningStreak">0일</strong>
+              <small id="longestWinningStreakRange">기록 없음</small>
+            </article>
+            <article class="streak-hero month">
+              <span>이번 표시 월</span>
+              <strong id="calendarWinningDays">0일</strong>
+              <small id="calendarMonthSummary">수익 거래일 0 · 손실 거래일 0</small>
+            </article>
+          </div>
+
+          <div class="calendar-legend" aria-label="캘린더 범례">
+            <span><i class="legend-dot win"></i>수익 마감</span>
+            <span><i class="legend-dot loss"></i>손실 마감</span>
+            <span><i class="legend-dot flat"></i>본전 마감</span>
+            <span><i class="legend-dot idle"></i>거래 없음</span>
+          </div>
+
+          <div class="trade-calendar-wrap">
+            <div class="trade-calendar-weekdays" aria-hidden="true">
+              <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+            </div>
+            <div id="tradeCalendar" class="trade-calendar"></div>
+          </div>
+
+          <p class="calendar-definition">
+            Winning Streak는 <strong>일간 순손익이 0보다 큰 거래일</strong>을 연속으로 계산합니다.
+            거래가 없는 주말·휴일·휴식일은 streak를 끊지 않으며, 손실 또는 본전으로 끝난 거래일에서 streak가 종료됩니다.
+          </p>
+        </section>
+
         <div class="wr-period-grid">
           <article class="wr-breakdown-card">
             <div class="wr-breakdown-head">
