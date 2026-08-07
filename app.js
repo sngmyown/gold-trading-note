@@ -287,8 +287,8 @@ function formatDuration(minutes) {
 }
 
 function resultOfTrade(trade) {
-  if (trade.pnl > 0.005) return "win";
-  if (trade.pnl < -0.005) return "loss";
+  if (trade.pnl > 0) return "win";
+  if (trade.pnl < 0) return "loss";
   return "breakeven";
 }
 
@@ -1118,9 +1118,241 @@ function renderDailyPnlChart(trades) {
 }
 
 function renderEquityChart(trades) {
-  let total = 0;
-  const points = trades.map((trade, index) => ({ label: String(index + 1), value: total += trade.pnl }));
-  renderLineSvg($("equityChart"), points);
+  const container = $("equityChart");
+  const caption = $("equityChartCaption");
+  const grouped = new Map();
+
+  trades.forEach((trade) => {
+    if (!trade.date) return;
+    if (!grouped.has(trade.date)) {
+      grouped.set(trade.date, {
+        date: trade.date,
+        trades: [],
+        dailyPnl: 0,
+        grossProfit: 0,
+        grossLoss: 0,
+        wins: 0,
+        losses: 0,
+        breakeven: 0,
+        accounts: new Set(),
+        assets: new Set()
+      });
+    }
+
+    const day = grouped.get(trade.date);
+    const pnl = Number(trade.pnl) || 0;
+    day.trades.push(trade);
+    day.dailyPnl += pnl;
+    day.accounts.add(trade.account === "live" ? "실제" : "데모");
+    day.assets.add(assetLabel(assetOfTrade(trade)));
+
+    if (pnl > 0) {
+      day.wins += 1;
+      day.grossProfit += pnl;
+    } else if (pnl < 0) {
+      day.losses += 1;
+      day.grossLoss += Math.abs(pnl);
+    } else {
+      day.breakeven += 1;
+    }
+  });
+
+  let cumulative = 0;
+  const points = [...grouped.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((day) => {
+      cumulative += day.dailyPnl;
+      return {
+        ...day,
+        cumulative,
+        count: day.trades.length,
+        winRate: day.trades.length ? day.wins / day.trades.length * 100 : 0,
+        accounts: [...day.accounts],
+        assets: [...day.assets]
+      };
+    });
+
+  if (!points.length) {
+    caption.textContent = "날짜별 집계";
+    container.innerHTML = '<div class="empty-state">표시할 거래가 없습니다.</div>';
+    return;
+  }
+
+  caption.textContent = `${points.length}거래일 · ${trades.length}회 매매 · 최종 ${formatMoney(points.at(-1).cumulative)}`;
+
+  const width = 980;
+  const height = 390;
+  const pad = { l: 82, r: 30, t: 30, b: 62 };
+  const domain = chartDomain(points.map((point) => ({ value: point.cumulative })));
+  const plotWidth = width - pad.l - pad.r;
+  const plotHeight = height - pad.t - pad.b;
+  const x = (index) => points.length === 1
+    ? pad.l + plotWidth / 2
+    : pad.l + index / (points.length - 1) * plotWidth;
+  const y = (value) => pad.t + (domain.max - value) / (domain.max - domain.min) * plotHeight;
+  const zeroY = y(0);
+  const coordinates = points.map((point, index) => ({
+    ...point,
+    x: x(index),
+    y: y(point.cumulative)
+  }));
+
+  const yTickCount = 5;
+  const yTicks = Array.from({ length: yTickCount + 1 }, (_, index) => {
+    const value = domain.max - index / yTickCount * (domain.max - domain.min);
+    return { value, y: y(value) };
+  });
+
+  const maxDateLabels = 8;
+  const dateStep = Math.max(1, Math.ceil(points.length / maxDateLabels));
+  const dateTicks = coordinates.filter((_, index) =>
+    index === 0 || index === coordinates.length - 1 || index % dateStep === 0
+  );
+
+  const linePath = coordinates
+    .map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+    .join(" ");
+  const areaPath = `${linePath} L${coordinates.at(-1).x.toFixed(2)},${zeroY.toFixed(2)} L${coordinates[0].x.toFixed(2)},${zeroY.toFixed(2)} Z`;
+
+  const yGrid = yTicks.map((tick) => `
+    <g>
+      <line x1="${pad.l}" x2="${width - pad.r}" y1="${tick.y}" y2="${tick.y}" stroke="rgba(255,255,255,.075)" stroke-dasharray="3 6" />
+      <text x="${pad.l - 13}" y="${tick.y + 4}" fill="#8f9bad" font-size="11" text-anchor="end">${escapeHtml(formatAxisMoney(tick.value))}</text>
+    </g>
+  `).join("");
+
+  const xLabels = dateTicks.map((point) => `
+    <g>
+      <line x1="${point.x}" x2="${point.x}" y1="${height - pad.b + 4}" y2="${height - pad.b + 10}" stroke="rgba(255,255,255,.22)" />
+      <text x="${point.x}" y="${height - 25}" fill="#8f9bad" font-size="11" text-anchor="middle">${escapeHtml(formatChartDate(point.date))}</text>
+    </g>
+  `).join("");
+
+  const pointNodes = coordinates.map((point, index) => {
+    const pointColor = point.dailyPnl > 0 ? "#44d48b" : point.dailyPnl < 0 ? "#ff7373" : "#f1c75b";
+    return `
+      <g class="equity-point-group" data-equity-index="${index}">
+        <circle cx="${point.x}" cy="${point.y}" r="9" fill="${pointColor}" opacity=".12" />
+        <circle cx="${point.x}" cy="${point.y}" r="4.5" fill="${pointColor}" stroke="#0b0f18" stroke-width="2" />
+      </g>
+    `;
+  }).join("");
+
+  const hoverBands = coordinates.map((point, index) => {
+    const previousX = index === 0 ? pad.l : (coordinates[index - 1].x + point.x) / 2;
+    const nextX = index === coordinates.length - 1 ? width - pad.r : (point.x + coordinates[index + 1].x) / 2;
+    return `<rect class="equity-hover-band" data-equity-index="${index}" x="${previousX}" y="${pad.t}" width="${Math.max(1, nextX - previousX)}" height="${plotHeight}" fill="transparent" tabindex="0" role="button" aria-label="${escapeHtml(formatDate(point.date))} 누적 손익 ${escapeHtml(formatMoney(point.cumulative))}" />`;
+  }).join("");
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="날짜별 누적 손익 그래프">
+      <defs>
+        <linearGradient id="equityAreaGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f1c75b" stop-opacity=".32" />
+          <stop offset="100%" stop-color="#f1c75b" stop-opacity=".015" />
+        </linearGradient>
+        <filter id="equityGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      ${yGrid}
+      <line x1="${pad.l}" x2="${width - pad.r}" y1="${zeroY}" y2="${zeroY}" stroke="rgba(241,199,91,.3)" stroke-width="1.2" />
+      <text x="22" y="${pad.t + plotHeight / 2}" fill="#8f9bad" font-size="11" text-anchor="middle" transform="rotate(-90 22 ${pad.t + plotHeight / 2})">누적 손익 (USD)</text>
+      <path d="${areaPath}" fill="url(#equityAreaGradient)" />
+      <path d="${linePath}" fill="none" stroke="rgba(241,199,91,.22)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" filter="url(#equityGlow)" />
+      <path d="${linePath}" fill="none" stroke="#f1c75b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      ${pointNodes}
+      ${xLabels}
+      <text x="${pad.l + plotWidth / 2}" y="${height - 5}" fill="#8f9bad" font-size="11" text-anchor="middle">거래 날짜</text>
+      <line id="equityHoverGuide" x1="0" x2="0" y1="${pad.t}" y2="${height - pad.b}" stroke="rgba(255,255,255,.32)" stroke-width="1" stroke-dasharray="4 5" opacity="0" />
+      <circle id="equityFocusRing" cx="0" cy="0" r="9" fill="none" stroke="#fff" stroke-width="1.5" opacity="0" />
+      ${hoverBands}
+    </svg>
+    <div id="equityTooltip" class="equity-tooltip" aria-live="polite"></div>
+  `;
+
+  const tooltip = container.querySelector("#equityTooltip");
+  const guide = container.querySelector("#equityHoverGuide");
+  const focusRing = container.querySelector("#equityFocusRing");
+  const svg = container.querySelector("svg");
+
+  const showPoint = (index) => {
+    const point = coordinates[index];
+    if (!point) return;
+
+    const dailyClass = point.dailyPnl > 0 ? "positive" : point.dailyPnl < 0 ? "negative" : "";
+    const cumulativeClass = point.cumulative > 0 ? "positive" : point.cumulative < 0 ? "negative" : "";
+    tooltip.innerHTML = `
+      <div class="equity-tooltip-date">
+        <strong>${escapeHtml(formatDate(point.date))}</strong>
+        <span>${point.count}회 매매</span>
+      </div>
+      <div class="equity-tooltip-main">
+        <div class="equity-tooltip-item ${cumulativeClass}"><span>누적 손익</span><strong>${escapeHtml(formatMoney(point.cumulative))}</strong></div>
+        <div class="equity-tooltip-item ${dailyClass}"><span>당일 손익</span><strong>${escapeHtml(formatMoney(point.dailyPnl))}</strong></div>
+        <div class="equity-tooltip-item"><span>당일 WR</span><strong>${escapeHtml(formatNumber(point.winRate, 1))}%</strong></div>
+        <div class="equity-tooltip-item"><span>총이익 / 총손실</span><strong>${escapeHtml(formatMoney(point.grossProfit))} / ${escapeHtml(formatMoney(-point.grossLoss))}</strong></div>
+      </div>
+      <div class="equity-tooltip-footer">
+        <span class="equity-tooltip-chip">승 ${point.wins}</span>
+        <span class="equity-tooltip-chip">패 ${point.losses}</span>
+        <span class="equity-tooltip-chip">본전 ${point.breakeven}</span>
+        <span class="equity-tooltip-chip">${escapeHtml(point.accounts.join(" · ") || "-")}</span>
+        <span class="equity-tooltip-chip">${escapeHtml(point.assets.join(" · ") || "-")}</span>
+      </div>
+    `;
+
+    const svgRect = svg.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const left = svgRect.left - containerRect.left + point.x / width * svgRect.width;
+    const top = svgRect.top - containerRect.top + point.y / height * svgRect.height;
+    const safeLeft = Math.max(145, Math.min(containerRect.width - 145, left));
+
+    const showBelow = top < 190;
+    tooltip.classList.toggle("below", showBelow);
+    tooltip.style.left = `${safeLeft}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.classList.add("visible");
+    guide.setAttribute("x1", point.x);
+    guide.setAttribute("x2", point.x);
+    guide.setAttribute("opacity", "1");
+    focusRing.setAttribute("cx", point.x);
+    focusRing.setAttribute("cy", point.y);
+    focusRing.setAttribute("opacity", "1");
+  };
+
+  const hidePoint = () => {
+    tooltip.classList.remove("visible", "below");
+    guide.setAttribute("opacity", "0");
+    focusRing.setAttribute("opacity", "0");
+  };
+
+  container.querySelectorAll(".equity-hover-band").forEach((band) => {
+    const index = Number(band.dataset.equityIndex);
+    band.addEventListener("mouseenter", () => showPoint(index));
+    band.addEventListener("mousemove", () => showPoint(index));
+    band.addEventListener("focus", () => showPoint(index));
+    band.addEventListener("touchstart", () => showPoint(index), { passive: true });
+    band.addEventListener("mouseleave", hidePoint);
+    band.addEventListener("blur", hidePoint);
+  });
+
+  container.addEventListener("mouseleave", hidePoint);
+}
+
+function formatChartDate(dateString) {
+  const date = new Date(`${dateString}T00:00:00`);
+  return new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(date);
+}
+
+function formatAxisMoney(value) {
+  const absolute = Math.abs(Number(value) || 0);
+  const sign = Number(value) < 0 ? "−" : "";
+  if (absolute >= 1000000) return `${sign}$${formatNumber(absolute / 1000000, 1)}M`;
+  if (absolute >= 1000) return `${sign}$${formatNumber(absolute / 1000, 1)}K`;
+  if (absolute >= 10) return `${sign}$${formatNumber(absolute, 0)}`;
+  return `${sign}$${formatNumber(absolute, 2)}`;
 }
 
 function chartDomain(points) {
