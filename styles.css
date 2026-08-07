@@ -446,9 +446,33 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .chart-card { padding: 17px; }
 .chart-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
 .chart-head h3 { margin: 0; }
+.chart-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .chart-head span { color: var(--muted); font-size: 11px; }
 .svg-chart { min-height: 260px; border: 1px solid rgba(255,255,255,.06); border-radius: 13px; background: rgba(4,7,12,.32); overflow: hidden; }
 .svg-chart svg { display: block; width: 100%; height: 260px; }
+.daily-pnl-chart-card, .equity-chart-card { grid-column: 1 / -1; }
+.equity-chart-card { position: relative; overflow: visible; }
+.equity-chart-head { align-items: flex-start; }
+.equity-chart { position: relative; min-height: 390px; overflow: visible; background: radial-gradient(circle at 50% 0%, rgba(241,199,91,.07), transparent 48%), rgba(4,7,12,.42); }
+.equity-chart svg { height: 390px; overflow: visible; }
+.equity-tooltip { position: absolute; z-index: 20; width: min(270px, calc(100% - 24px)); pointer-events: none; transform: translate(-50%, calc(-100% - 16px)); border: 1px solid rgba(241,199,91,.28); border-radius: 14px; padding: 13px 14px; background: rgba(10,14,22,.96); box-shadow: 0 18px 42px rgba(0,0,0,.42); backdrop-filter: blur(10px); opacity: 0; visibility: hidden; transition: opacity .12s ease; }
+.equity-tooltip.visible { opacity: 1; visibility: visible; }
+.equity-tooltip.below { transform: translate(-50%, 16px); }
+.equity-tooltip::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg); background: rgba(10,14,22,.96); border-right: 1px solid rgba(241,199,91,.28); border-bottom: 1px solid rgba(241,199,91,.28); }
+.equity-tooltip.below::after { top: -7px; bottom: auto; border: 0; border-left: 1px solid rgba(241,199,91,.28); border-top: 1px solid rgba(241,199,91,.28); }
+.equity-tooltip-date { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 9px; margin-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.equity-tooltip-date strong { font-size: 14px; }
+.equity-tooltip-date span { color: var(--muted); font-size: 10px; }
+.equity-tooltip-main { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.equity-tooltip-item { padding: 8px 9px; border-radius: 9px; background: rgba(255,255,255,.035); }
+.equity-tooltip-item span { display: block; margin-bottom: 3px; color: var(--muted); font-size: 9px; }
+.equity-tooltip-item strong { font-size: 13px; }
+.equity-tooltip-item.positive strong { color: var(--green); }
+.equity-tooltip-item.negative strong { color: var(--red); }
+.equity-tooltip-footer { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.equity-tooltip-chip { padding: 4px 7px; border: 1px solid rgba(255,255,255,.09); border-radius: 999px; color: var(--muted); font-size: 9px; }
+.equity-hover-band { cursor: crosshair; outline: none; }
+.equity-hover-band:focus { stroke: rgba(241,199,91,.32); stroke-width: 1; }
 .comparison-table { width: 100%; border-collapse: collapse; }
 .comparison-table th, .comparison-table td { padding: 10px; border-bottom: 1px solid var(--border); text-align: right; }
 .comparison-table th:first-child, .comparison-table td:first-child { text-align: left; }
@@ -474,6 +498,10 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
   .trade-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
 }
 @media (max-width: 760px) {
+  .equity-chart { min-height: 340px; overflow-x: auto; overflow-y: visible; }
+  .equity-chart svg { min-width: 720px; height: 340px; }
+  .equity-tooltip, .equity-tooltip.below { position: fixed; left: 50% !important; top: auto !important; bottom: 18px; transform: translateX(-50%); }
+  .equity-tooltip::after { display: none; }
   .header-dashboard { width: 100%; }
   .header-status { grid-template-columns: 1fr; }
   .header-status div { border-right: 0; border-bottom: 1px solid var(--border); }
