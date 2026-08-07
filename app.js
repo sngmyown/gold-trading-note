@@ -27,6 +27,16 @@ const CAPITAL_LEVELS = [
   { level: 10, amount: 12150000, multiplier: 121.5, rule: "1.5× · 1000만원대" }
 ];
 
+const DEFAULT_TRADING_PRINCIPLES = Object.freeze([
+  "분석 시간대와 거래 보유 시간을 고정한다",
+  "일관된 Swing 기준으로 주요 고점과 저점을 표시한다",
+  "같은 구조 계층의 고저점관계를 바탕으로 trend 와 range 로 구별한다",
+  "impulse 와 pullback 의 크기, 속도 그리고 시간을 비교한다",
+  "현재 가격이 주요 구조 안에서 어디에 위치하는지 평가한다",
+  "추세 약화, 구조 훼손, 반대 구조 형성을 구분한다",
+  "상위 구조 (4H), 중간 구조 (1H), 하위 타점 구조 (15m) 의 시간대에 역할을 실행한다"
+]);
+
 const DEFAULT_STATE = {
   version: 1,
   activeAccount: "all",
@@ -34,6 +44,7 @@ const DEFAULT_STATE = {
   trades: [],
   dailyReviews: {},
   strategyGoal: { text: "", color: "#f1c75b", updatedAt: null },
+  tradingPrinciples: { items: [...DEFAULT_TRADING_PRINCIPLES], updatedAt: null },
   levelSystem: { unlockedLevel: 1, lastUnlockedAt: null },
   settings: { gcMultiplier: 100, mgcMultiplier: 10, btcMultiplier: 1, customMultiplier: 1 },
   updatedAt: null
@@ -104,6 +115,15 @@ function cloneDefaultState() {
   return JSON.parse(JSON.stringify(DEFAULT_STATE));
 }
 
+function normalizeTradingPrinciples(source) {
+  const candidate = Array.isArray(source?.items) ? source.items : DEFAULT_TRADING_PRINCIPLES;
+  const items = DEFAULT_TRADING_PRINCIPLES.map((fallback, index) => {
+    const value = String(candidate[index] ?? fallback).trim();
+    return value || fallback;
+  });
+  return { items, updatedAt: source?.updatedAt || null };
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -114,6 +134,7 @@ function loadState() {
       ...parsed,
       settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) },
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(parsed.strategyGoal || {}) },
+      tradingPrinciples: normalizeTradingPrinciples(parsed.tradingPrinciples),
       levelSystem: { ...DEFAULT_STATE.levelSystem, ...(parsed.levelSystem || {}) },
       analyses: parsed.analyses || {},
       trades: Array.isArray(parsed.trades) ? parsed.trades.map(normalizeTradeRecord) : [],
@@ -603,6 +624,7 @@ function updateHeader() {
   $("analysisStatus").style.color = state.analyses[today] ? "var(--green)" : "var(--orange)";
   $("activeAccountLabel").textContent = state.activeAccount === "demo" ? "데모" : state.activeAccount === "live" ? "실제" : "전체";
   renderStrategyGoal();
+  renderTradingPrinciples();
   renderLevelSystem();
 }
 
@@ -682,6 +704,84 @@ function setupStrategyGoal() {
   });
 
   renderStrategyGoal();
+}
+
+function renderTradingPrinciples() {
+  const list = $("tradingPrinciplesList");
+  if (!list) return;
+  const items = normalizeTradingPrinciples(state.tradingPrinciples).items;
+  list.replaceChildren();
+  items.forEach((principle) => {
+    const item = document.createElement("li");
+    item.className = "trading-principle-item";
+    const text = document.createElement("span");
+    text.textContent = principle;
+    item.appendChild(text);
+    list.appendChild(item);
+  });
+}
+
+function renderTradingPrinciplesEditor() {
+  const container = $("tradingPrinciplesEditorFields");
+  if (!container) return;
+  const items = normalizeTradingPrinciples(state.tradingPrinciples).items;
+  container.replaceChildren();
+  items.forEach((principle, index) => {
+    const label = document.createElement("label");
+    label.className = "trading-principle-edit-field";
+    const caption = document.createElement("span");
+    caption.textContent = `원칙 ${index + 1}`;
+    const textarea = document.createElement("textarea");
+    textarea.dataset.principleIndex = String(index);
+    textarea.rows = 3;
+    textarea.maxLength = 240;
+    textarea.value = principle;
+    label.append(caption, textarea);
+    container.appendChild(label);
+  });
+}
+
+function openTradingPrinciplesEditor() {
+  renderTradingPrinciplesEditor();
+  $("tradingPrinciplesForm")?.classList.remove("hidden");
+  $("editTradingPrinciplesButton")?.classList.add("hidden");
+  const first = $("tradingPrinciplesEditorFields")?.querySelector("textarea");
+  first?.focus();
+}
+
+function closeTradingPrinciplesEditor() {
+  $("tradingPrinciplesForm")?.classList.add("hidden");
+  $("editTradingPrinciplesButton")?.classList.remove("hidden");
+}
+
+function setupTradingPrinciples() {
+  $("editTradingPrinciplesButton").addEventListener("click", openTradingPrinciplesEditor);
+  $("cancelTradingPrinciplesButton").addEventListener("click", closeTradingPrinciplesEditor);
+
+  $("tradingPrinciplesForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const textareas = $$("#tradingPrinciplesEditorFields textarea");
+    const items = DEFAULT_TRADING_PRINCIPLES.map((fallback, index) => {
+      const value = String(textareas[index]?.value || "").trim();
+      return value || fallback;
+    });
+    state.tradingPrinciples = { items, updatedAt: new Date().toISOString() };
+    saveState();
+    closeTradingPrinciplesEditor();
+    notify("매매 원칙 7가지를 저장했습니다.");
+  });
+
+  $("resetTradingPrinciplesButton").addEventListener("click", async () => {
+    const accepted = await confirmAction("기본 7원칙 복원", "현재 편집한 매매 원칙을 처음 설정한 7가지 원칙으로 되돌립니다.");
+    if (!accepted) return;
+    state.tradingPrinciples = { items: [...DEFAULT_TRADING_PRINCIPLES], updatedAt: new Date().toISOString() };
+    saveState();
+    renderTradingPrinciplesEditor();
+    closeTradingPrinciplesEditor();
+    notify("기본 매매 원칙 7가지를 복원했습니다.");
+  });
+
+  renderTradingPrinciples();
 }
 
 function levelEligibleTrades() {
@@ -1999,6 +2099,7 @@ async function importBackup(event) {
       ...payload.state,
       settings: { ...DEFAULT_STATE.settings, ...(payload.state.settings || {}) },
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(payload.state.strategyGoal || {}) },
+      tradingPrinciples: normalizeTradingPrinciples(payload.state.tradingPrinciples),
       levelSystem: { ...DEFAULT_STATE.levelSystem, ...(payload.state.levelSystem || {}) },
       trades: Array.isArray(payload.state.trades) ? payload.state.trades.map(normalizeTradeRecord) : []
     };
@@ -2068,6 +2169,7 @@ async function init() {
 
   safeRun("탭 초기화", setupTabs);
   safeRun("전략 목표 초기화", setupStrategyGoal);
+  safeRun("매매 원칙 초기화", setupTradingPrinciples);
   safeRun("시장 세션 초기화", setupMarketSessions);
   safeRun("금 분석 초기화", setupAnalysis);
   safeRun("거래 기록 초기화", setupTradeForm);
