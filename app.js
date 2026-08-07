@@ -31,6 +31,7 @@ let pendingTradeImages = [];
 let currentTradeImageIds = [];
 let confirmResolver = null;
 let marketSessionTimer = null;
+let calendarViewDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 const $ = (id) => document.getElementById(id);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -1061,6 +1062,22 @@ function saveDailyReview(event) {
 function setupAnalytics() {
   $("analyticsPeriod").addEventListener("change", renderAnalytics);
   $("analyticsAccount").addEventListener("change", renderAnalytics);
+
+  $("calendarPrevMonth")?.addEventListener("click", () => {
+    calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1);
+    renderTradeCalendar();
+  });
+
+  $("calendarNextMonth")?.addEventListener("click", () => {
+    calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 1);
+    renderTradeCalendar();
+  });
+
+  $("calendarTodayButton")?.addEventListener("click", () => {
+    const now = new Date();
+    calendarViewDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    renderTradeCalendar();
+  });
 }
 
 function analyticsRange(period) {
@@ -1103,10 +1120,227 @@ function renderAnalytics() {
     ["평균 보유", formatDuration(Math.round(stats.avgDuration)), ""]
   ].map(([label,value,cls]) => `<div class="summary-card ${cls}"><span>${label}</span><strong>${value}</strong></div>`).join("");
   renderPeriodWinRateBreakdowns();
+  renderTradeCalendar();
   renderDailyPnlChart(trades);
   renderEquityChart(trades);
   renderAccountComparison(trades);
   renderPatternSummary(trades);
+}
+
+
+function analyticsAccountFilteredTrades() {
+  const account = $("analyticsAccount")?.value || "all";
+  return [...state.trades]
+    .filter((trade) => account === "all" || trade.account === account)
+    .filter((trade) => Boolean(trade.date))
+    .sort((a, b) => `${a.date} ${a.entryTime || ""}`.localeCompare(`${b.date} ${b.entryTime || ""}`));
+}
+
+function buildDailyTradingPerformance(trades) {
+  const grouped = new Map();
+
+  trades.forEach((trade) => {
+    if (!trade.date) return;
+    if (!grouped.has(trade.date)) {
+      grouped.set(trade.date, {
+        date: trade.date,
+        trades: [],
+        netPnl: 0,
+        grossProfit: 0,
+        grossLoss: 0,
+        wins: 0,
+        losses: 0,
+        breakeven: 0,
+        accounts: new Set(),
+        assets: new Set()
+      });
+    }
+
+    const day = grouped.get(trade.date);
+    const pnl = Number(trade.pnl) || 0;
+    day.trades.push(trade);
+    day.netPnl += pnl;
+    day.accounts.add(trade.account === "live" ? "실제" : "데모");
+    day.assets.add(assetLabel(assetOfTrade(trade)));
+
+    if (pnl > 0) {
+      day.wins += 1;
+      day.grossProfit += pnl;
+    } else if (pnl < 0) {
+      day.losses += 1;
+      day.grossLoss += Math.abs(pnl);
+    } else {
+      day.breakeven += 1;
+    }
+  });
+
+  return [...grouped.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((day) => ({
+      ...day,
+      count: day.trades.length,
+      winRate: day.trades.length ? day.wins / day.trades.length * 100 : 0,
+      accounts: [...day.accounts],
+      assets: [...day.assets],
+      result: day.netPnl > 0 ? "win" : day.netPnl < 0 ? "loss" : "flat"
+    }));
+}
+
+function calculateWinningStreaks(days) {
+  let current = { count: 0, start: null, end: null };
+  let longest = { count: 0, start: null, end: null };
+  let running = { count: 0, start: null, end: null };
+
+  days.forEach((day) => {
+    if (day.netPnl > 0) {
+      if (running.count === 0) running.start = day.date;
+      running.count += 1;
+      running.end = day.date;
+
+      if (running.count > longest.count) {
+        longest = { ...running };
+      }
+    } else {
+      running = { count: 0, start: null, end: null };
+    }
+  });
+
+  if (days.length && days.at(-1).netPnl > 0) {
+    current = { ...running };
+  }
+
+  return { current, longest };
+}
+
+function formatStreakRange(streak) {
+  if (!streak?.count || !streak.start || !streak.end) return "기록 없음";
+  if (streak.start === streak.end) return formatDate(streak.start);
+  return `${formatChartDate(streak.start)} ~ ${formatChartDate(streak.end)}`;
+}
+
+function renderTradeCalendar() {
+  const container = $("tradeCalendar");
+  if (!container) return;
+
+  const trades = analyticsAccountFilteredTrades();
+  const days = buildDailyTradingPerformance(trades);
+  const dayMap = new Map(days.map((day) => [day.date, day]));
+  const { current, longest } = calculateWinningStreaks(days);
+
+  $("currentWinningStreak").textContent = `${current.count}일`;
+  $("currentWinningStreakRange").textContent = current.count
+    ? `${formatStreakRange(current)} · 마지막 거래일까지 연속 수익`
+    : "최근 거래일이 수익으로 끝나지 않았습니다.";
+
+  $("longestWinningStreak").textContent = `${longest.count}일`;
+  $("longestWinningStreakRange").textContent = longest.count
+    ? formatStreakRange(longest)
+    : "기록 없음";
+
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const firstWeekday = monthStart.getDay();
+  const daysInMonth = monthEnd.getDate();
+
+  $("calendarMonthLabel").textContent = `${year}년 ${month + 1}월`;
+
+  const monthDays = days.filter((day) => {
+    const date = new Date(`${day.date}T00:00:00`);
+    return date.getFullYear() === year && date.getMonth() === month;
+  });
+
+  const monthWins = monthDays.filter((day) => day.netPnl > 0).length;
+  const monthLosses = monthDays.filter((day) => day.netPnl < 0).length;
+  const monthFlat = monthDays.filter((day) => day.netPnl === 0).length;
+  const monthPnl = monthDays.reduce((sum, day) => sum + day.netPnl, 0);
+
+  $("calendarWinningDays").textContent = `${monthWins}일`;
+  $("calendarMonthSummary").textContent =
+    `수익 ${monthWins} · 손실 ${monthLosses} · 본전 ${monthFlat} · ${formatMoney(monthPnl)}`;
+
+  const previousMonth = new Date(year, month, 0);
+  const previousMonthDays = previousMonth.getDate();
+  const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+  const today = localDateString();
+
+  const cells = [];
+
+  for (let cellIndex = 0; cellIndex < totalCells; cellIndex += 1) {
+    let cellDate;
+    let inCurrentMonth = true;
+
+    if (cellIndex < firstWeekday) {
+      const dayNumber = previousMonthDays - firstWeekday + cellIndex + 1;
+      cellDate = new Date(year, month - 1, dayNumber);
+      inCurrentMonth = false;
+    } else if (cellIndex >= firstWeekday + daysInMonth) {
+      const dayNumber = cellIndex - firstWeekday - daysInMonth + 1;
+      cellDate = new Date(year, month + 1, dayNumber);
+      inCurrentMonth = false;
+    } else {
+      cellDate = new Date(year, month, cellIndex - firstWeekday + 1);
+    }
+
+    const dateString = localDateString(cellDate);
+    const performance = dayMap.get(dateString);
+    const resultClass = performance ? performance.result : "idle";
+    const isToday = dateString === today;
+    const accountClass = performance?.accounts?.length === 1
+      ? (performance.accounts[0] === "실제" ? "live-only" : "demo-only")
+      : "";
+
+    const tooltip = performance
+      ? `
+        <div class="calendar-tooltip">
+          <strong>${escapeHtml(formatDate(dateString))}</strong>
+          <div><span>당일 순손익</span><b class="${performance.netPnl > 0 ? "positive" : performance.netPnl < 0 ? "negative" : ""}">${escapeHtml(formatMoney(performance.netPnl))}</b></div>
+          <div><span>거래 수</span><b>${performance.count}회</b></div>
+          <div><span>당일 WR</span><b>${escapeHtml(formatNumber(performance.winRate, 1))}%</b></div>
+          <div><span>승 / 패 / 본전</span><b>${performance.wins} / ${performance.losses} / ${performance.breakeven}</b></div>
+          <small>${escapeHtml(performance.accounts.join(" · "))}${performance.assets.length ? ` · ${escapeHtml(performance.assets.join(" · "))}` : ""}</small>
+        </div>
+      `
+      : `
+        <div class="calendar-tooltip">
+          <strong>${escapeHtml(formatDate(dateString))}</strong>
+          <div><span>거래 기록</span><b>없음</b></div>
+        </div>
+      `;
+
+    cells.push(`
+      <button
+        class="calendar-day ${resultClass} ${inCurrentMonth ? "" : "outside"} ${isToday ? "today" : ""} ${accountClass}"
+        type="button"
+        data-calendar-date="${dateString}"
+        aria-label="${escapeHtml(formatDate(dateString))}${performance ? ` ${escapeHtml(formatMoney(performance.netPnl))}` : " 거래 없음"}"
+      >
+        <span class="calendar-day-number">${cellDate.getDate()}</span>
+        ${
+          performance
+            ? `
+              <span class="calendar-day-result">${performance.netPnl > 0 ? "WIN" : performance.netPnl < 0 ? "LOSS" : "FLAT"}</span>
+              <strong class="calendar-day-pnl">${escapeHtml(formatMoney(performance.netPnl))}</strong>
+              <small>${performance.count}회 · WR ${escapeHtml(formatNumber(performance.winRate, 0))}%</small>
+            `
+            : '<span class="calendar-day-idle">—</span>'
+        }
+        ${tooltip}
+      </button>
+    `);
+  }
+
+  container.innerHTML = cells.join("");
+
+  $$("[data-calendar-date]", container).forEach((button) => {
+    button.addEventListener("click", () => {
+      const date = button.dataset.calendarDate;
+      if ($("dailyDate")) $("dailyDate").value = date;
+      document.querySelector(".tab[data-view='daily']")?.click();
+      renderDaily();
+    });
+  });
 }
 
 function renderDailyPnlChart(trades) {
