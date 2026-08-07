@@ -77,6 +77,53 @@
         </form>
       </section>
 
+      <section class="level-system-card" aria-labelledby="levelSystemTitle">
+        <div class="level-system-head">
+          <div>
+            <span id="levelSystemTitle">CAPITAL LEVEL-UP SYSTEM</span>
+            <small>실제 계좌 · 금 거래 기준 · 20 연속 수익 거래일마다 1단계 잠금 해제</small>
+          </div>
+          <div class="level-system-badge">
+            <span>현재 레벨</span>
+            <strong id="capitalLevelBadge">LV.1</strong>
+          </div>
+        </div>
+
+        <div class="level-system-main">
+          <div class="level-current-allocation">
+            <span>현재 허용 운용 비중</span>
+            <strong id="capitalCurrentAmount">₩100,000</strong>
+            <small id="capitalCurrentRule">START · 1.0×</small>
+          </div>
+          <div class="level-next-target">
+            <span>다음 잠금 해제</span>
+            <strong id="capitalNextAmount">₩200,000</strong>
+            <small id="capitalNextLevel">LV.2 · 2.0×</small>
+          </div>
+        </div>
+
+        <div class="level-progress-block">
+          <div class="level-progress-copy">
+            <span>다음 레벨까지 Winning Streak</span>
+            <strong id="capitalStreakProgress">0 / 20일</strong>
+          </div>
+          <div class="level-progress-track" aria-hidden="true">
+            <div id="capitalStreakProgressBar" class="level-progress-bar"></div>
+          </div>
+          <div class="level-progress-meta">
+            <span id="capitalStreakStatus">20일 연속 수익 마감이 필요합니다.</span>
+            <span id="capitalUnlockSummary">1 / 10 단계 해제</span>
+          </div>
+        </div>
+
+        <div id="capitalLevelRail" class="level-rail" aria-label="비중 레벨 단계"></div>
+
+        <p class="level-system-note">
+          시작 기준 <strong>₩100,000 / 약 60 USDT(사용자 기준)</strong>. 잠금 해제는 비중 확대를 허용하는 내부 원칙이며 대시보드가 주문 수량을 자동으로 늘리지는 않습니다.
+          한 번 해제한 레벨은 이후 손실이 발생해도 다시 잠기지 않습니다.
+        </p>
+      </section>
+
       <section class="market-session-card" aria-labelledby="marketSessionTitle">
         <div class="market-session-head">
           <div>
