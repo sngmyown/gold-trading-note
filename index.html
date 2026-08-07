@@ -292,7 +292,7 @@
             <label class="form-field"><span>진입 시간</span><input id="entryTime" type="time" /></label>
             <label class="form-field"><span>청산 시간</span><input id="exitTime" type="time" /></label>
             <label class="form-field"><span>계약 수 <small class="field-hint">최소 0.001</small></span><input id="contracts" type="number" min="0.001" step="0.001" value="1" inputmode="decimal" /></label>
-            <label class="form-field"><span>수수료</span><input id="fees" type="number" step="0.001" value="0" inputmode="decimal" /></label>
+            <label class="form-field"><span>수수료</span><input id="fees" type="number" step="0.01" value="0" /></label>
           </div>
 
           <div class="field-grid four">
@@ -451,13 +451,19 @@
         </div>
 
         <div class="chart-grid">
-          <article class="chart-card">
+          <article class="chart-card daily-pnl-chart-card">
             <div class="chart-head"><h3>일별 순손익</h3><span id="pnlChartCaption"></span></div>
             <div id="dailyPnlChart" class="svg-chart"></div>
           </article>
-          <article class="chart-card">
-            <div class="chart-head"><h3>누적 손익</h3><span>거래 순서 기준</span></div>
-            <div id="equityChart" class="svg-chart"></div>
+          <article class="chart-card equity-chart-card">
+            <div class="chart-head equity-chart-head">
+              <div>
+                <h3>날짜별 누적 손익</h3>
+                <p>각 거래일의 누적 결과와 당일 성과를 확인합니다.</p>
+              </div>
+              <span id="equityChartCaption">날짜별 집계</span>
+            </div>
+            <div id="equityChart" class="svg-chart equity-chart"></div>
           </article>
         </div>
 
