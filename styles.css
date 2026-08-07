@@ -49,20 +49,27 @@ h3 { margin-bottom: 8px; }
 .hidden { display: none !important; }
 
 .site-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  align-items: stretch;
+  width: 100%;
   padding: 38px clamp(18px, 4vw, 58px) 28px;
   border-bottom: 1px solid var(--border);
+}
+.header-intro {
+  width: 100%;
+  min-width: 0;
 }
 .eyebrow { margin-bottom: 8px; color: var(--gold); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
 .subtitle { margin-bottom: 0; max-width: 720px; }
 .header-dashboard {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  width: min(620px, 48vw);
-  min-width: min(580px, 46vw);
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 .header-status {
   display: grid;
@@ -881,7 +888,7 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .confirm-card { width: min(440px, 96vw); }
 
 @media (max-width: 1080px) {
-  .site-header { align-items: flex-start; flex-direction: column; }
+  .site-header { align-items: stretch; }
   .header-dashboard { min-width: 0; width: 100%; }
   .header-status { width: 100%; }
   .market-session-timeline { grid-template-columns: repeat(3,minmax(0,1fr)); }
