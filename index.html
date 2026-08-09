@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="금 선물 매매 복기 대시보드" />
   <title>Gold Futures Trading Review</title>
-  <link rel="stylesheet" href="styles.css?v=10.0.0" />
-  <script src="app.js?v=10.0.0" defer></script>
+  <link rel="stylesheet" href="styles.css?v=11.0.0" />
+  <script src="app.js?v=11.0.0" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -345,9 +345,10 @@
 
         <form id="tradeForm" class="form-stack">
           <input id="tradeId" type="hidden" />
-          <div class="field-grid five">
+          <div class="field-grid six">
             <label class="form-field"><span>계좌</span><select id="tradeAccount"><option value="demo">데모</option><option value="live">실제</option></select></label>
             <label class="form-field"><span>거래일</span><input id="tradeDate" type="date" required /></label>
+            <label class="form-field"><span>전략</span><select id="tradeStrategy"><option value="range_program">횡보로직 프로그램</option><option value="trend_program">추세로직 프로그램</option><option value="ds_trend">DS Trend</option><option value="unspecified">전략 미지정</option></select></label>
             <label class="form-field"><span>자산</span><select id="tradeAsset"><option value="GOLD">금</option><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="NASDAQ">나스닥</option><option value="OIL">원유</option><option value="CUSTOM">직접 입력</option></select></label>
             <label class="form-field"><span>종목</span><select id="tradeSymbol"><option value="GC">GC</option><option value="MGC">MGC</option><option value="BTC">BTC</option><option value="BTCUSDT">BTCUSDT</option><option value="ETH">ETH</option><option value="NQ">NQ</option><option value="MNQ">MNQ</option><option value="CL">CL</option><option value="MCL">MCL</option><option value="CUSTOM">사용자 지정</option></select></label>
             <label class="form-field"><span>방향</span><select id="tradeDirection"><option value="long">Long</option><option value="short">Short</option></select></label>
@@ -437,9 +438,10 @@
 
       <div class="section-card">
         <div class="section-head split">
-          <div><h2>거래 기록</h2><p>계좌·기간·결과별로 필터링할 수 있습니다.</p></div>
+          <div><h2>거래 기록</h2><p>계좌·전략·자산·결과별로 필터링할 수 있습니다.</p></div>
           <div class="filter-row">
             <select id="tradeAccountFilter"><option value="all">전체 계좌</option><option value="demo">데모</option><option value="live">실제</option></select>
+            <select id="tradeStrategyFilter"><option value="all">전체 전략</option><option value="range_program">횡보로직 프로그램</option><option value="trend_program">추세로직 프로그램</option><option value="ds_trend">DS Trend</option><option value="unspecified">전략 미지정</option></select>
             <select id="tradeAssetFilter"><option value="all">전체 자산</option><option value="GOLD">금</option><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="NASDAQ">나스닥</option><option value="OIL">원유</option></select>
             <select id="tradeResultFilter"><option value="all">전체 결과</option><option value="win">수익</option><option value="loss">손실</option><option value="breakeven">본전</option></select>
             <input id="tradeSearch" type="search" placeholder="근거·복기·태그 검색" />
