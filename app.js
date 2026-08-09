@@ -27,6 +27,13 @@ const CAPITAL_LEVELS = [
   { level: 10, amount: 12150000, multiplier: 121.5, rule: "1.5× · 1000만원대" }
 ];
 
+const TRADE_STRATEGIES = Object.freeze({
+  range_program: { label: "횡보로직 프로그램", badgeClass: "strategy-range" },
+  trend_program: { label: "추세로직 프로그램", badgeClass: "strategy-trend" },
+  ds_trend: { label: "DS Trend", badgeClass: "strategy-ds" },
+  unspecified: { label: "전략 미지정", badgeClass: "strategy-unspecified" }
+});
+
 const DEFAULT_TRADING_PRINCIPLES = Object.freeze([
   "분석 시간대와 거래 보유 시간을 고정한다",
   "일관된 Swing 기준으로 주요 고점과 저점을 표시한다",
@@ -290,11 +297,33 @@ function normalizeAssetKey(asset, customAssetName, symbol) {
   return inferAssetFromSymbol(symbol);
 }
 
+function normalizeTradeStrategy(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (TRADE_STRATEGIES[raw] && raw !== "unspecified") return raw;
+  if (["횡보로직 프로그램", "횡보로직", "range", "range_program"].includes(raw)) return "range_program";
+  if (["추세로직 프로그램", "추세로직", "trend", "trend_program"].includes(raw)) return "trend_program";
+  if (["ds trend", "ds_trend", "dstrend"].includes(raw)) return "ds_trend";
+  return "unspecified";
+}
+
+function strategyOfTrade(trade) {
+  return normalizeTradeStrategy(trade?.strategy);
+}
+
+function strategyLabel(strategy) {
+  return TRADE_STRATEGIES[normalizeTradeStrategy(strategy)]?.label || TRADE_STRATEGIES.unspecified.label;
+}
+
+function strategyBadgeClass(strategy) {
+  return TRADE_STRATEGIES[normalizeTradeStrategy(strategy)]?.badgeClass || TRADE_STRATEGIES.unspecified.badgeClass;
+}
+
 function normalizeTradeRecord(trade) {
   const asset = normalizeAssetKey(trade?.asset, trade?.customAssetName, trade?.symbol);
   return {
     ...trade,
     asset,
+    strategy: normalizeTradeStrategy(trade?.strategy),
     customAssetName: trade?.customAssetName || ""
   };
 }
@@ -960,6 +989,7 @@ function setupTradeForm() {
   $("tradeDate").value = localDateString();
   $("tradeAccount").value = state.activeAccount === "live" ? "live" : "demo";
   $("tradeAsset").value = "GOLD";
+  $("tradeStrategy").value = "ds_trend";
   ["tradeSymbol", "tradeDirection", "tradeDate", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice"].forEach((id) => $(id).addEventListener("input", updateTradeCalculations));
   $("tradeAsset").addEventListener("change", () => updateAssetFieldVisibility(true));
   $("tradeSymbol").addEventListener("change", syncAssetFromSymbol);
@@ -969,6 +999,7 @@ function setupTradeForm() {
   $("changeAccountButton").addEventListener("click", () => document.querySelector(".tab[data-view='analysis']")?.click());
   $("reviewDepth").addEventListener("change", updateReviewDepth);
   $("tradeAccountFilter").addEventListener("change", renderTrades);
+  $("tradeStrategyFilter").addEventListener("change", renderTrades);
   $("tradeAssetFilter").addEventListener("change", renderTrades);
   $("tradeResultFilter").addEventListener("change", renderTrades);
   $("tradeSearch").addEventListener("input", renderTrades);
@@ -994,7 +1025,7 @@ function updateTradeCalculations() {
 }
 
 function tradeFieldIds() {
-  return ["tradeAccount", "tradeDate", "tradeSymbol", "tradeDirection", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice", "reviewDepth", "tradeReason", "tradeStrengths", "tradeMistakes", "nextAction", "psychology", "tradeReview", "frameworkTags", "timeframes", "analysisScore", "executionScore", "emotionScore"];
+  return ["tradeAccount", "tradeDate", "tradeStrategy", "tradeSymbol", "tradeDirection", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice", "reviewDepth", "tradeReason", "tradeStrengths", "tradeMistakes", "nextAction", "psychology", "tradeReview", "frameworkTags", "timeframes", "analysisScore", "executionScore", "emotionScore"];
 }
 
 async function saveTrade(event) {
@@ -1023,7 +1054,7 @@ async function saveTrade(event) {
     updatedAt: new Date().toISOString()
   };
   tradeFieldIds().forEach((field) => {
-    const idMap = { tradeAccount: "account", tradeDate: "date", tradeSymbol: "symbol", tradeDirection: "direction" };
+    const idMap = { tradeAccount: "account", tradeDate: "date", tradeStrategy: "strategy", tradeSymbol: "symbol", tradeDirection: "direction" };
     const key = idMap[field] || field;
     const input = $(field);
     trade[key] = input.type === "number" ? Number(input.value || 0) : input.value.trim();
@@ -1050,6 +1081,7 @@ function resetTradeForm() {
   $("tradeDate").value = localDateString();
   $("tradeAccount").value = state.activeAccount === "live" ? "live" : "demo";
   $("tradeAsset").value = "GOLD";
+  $("tradeStrategy").value = "ds_trend";
   $("customAssetName").value = "";
   $("tradeSymbol").value = "GC";
   $("tradeDirection").value = "long";
@@ -1071,7 +1103,7 @@ async function editTrade(id) {
   const trade = state.trades.find((item) => item.id === id);
   if (!trade) return;
   $("tradeId").value = trade.id;
-  const keyMap = { tradeAccount: "account", tradeDate: "date", tradeSymbol: "symbol", tradeDirection: "direction" };
+  const keyMap = { tradeAccount: "account", tradeDate: "date", tradeStrategy: "strategy", tradeSymbol: "symbol", tradeDirection: "direction" };
   tradeFieldIds().forEach((field) => {
     const key = keyMap[field] || field;
     const input = $(field);
@@ -1112,6 +1144,7 @@ async function renderTrades() {
     $("tradeAccountFilter").value = state.activeAccount;
   }
   const accountFilter = $("tradeAccountFilter")?.value || (state.activeAccount === "all" ? "all" : state.activeAccount);
+  const strategyFilter = $("tradeStrategyFilter")?.value || "all";
   const assetFilter = $("tradeAssetFilter")?.value || "all";
   const resultFilter = $("tradeResultFilter")?.value || "all";
   const query = ($("tradeSearch")?.value || "").trim().toLowerCase();
@@ -1119,11 +1152,12 @@ async function renderTrades() {
   const trades = [...state.trades]
     .map(normalizeTradeRecord)
     .filter((trade) => (accountFilter === "all" || trade.account === accountFilter))
+    .filter((trade) => (strategyFilter === "all" || strategyOfTrade(trade) === strategyFilter))
     .filter((trade) => (assetFilter === "all" || assetOfTrade(trade) === assetFilter))
     .filter((trade) => (resultFilter === "all" || resultOfTrade(trade) === resultFilter))
     .filter((trade) => {
       if (!query) return true;
-      return [assetLabel(assetOfTrade(trade)), trade.symbol, trade.tradeReason, trade.tradeReview, trade.tradeStrengths, trade.tradeMistakes, trade.nextAction, trade.psychology, ...(trade.frameworkTags || [])].join(" ").toLowerCase().includes(query);
+      return [assetLabel(assetOfTrade(trade)), strategyLabel(strategyOfTrade(trade)), trade.symbol, trade.tradeReason, trade.tradeReview, trade.tradeStrengths, trade.tradeMistakes, trade.nextAction, trade.psychology, ...(trade.frameworkTags || [])].join(" ").toLowerCase().includes(query);
     })
     .sort((a, b) => `${b.date} ${b.entryTime || ""}`.localeCompare(`${a.date} ${a.entryTime || ""}`));
 
@@ -1143,6 +1177,7 @@ async function renderTrades() {
           <div class="trade-card-title">
             <strong>${escapeHtml(trade.symbol)} · ${trade.direction === "long" ? "LONG" : "SHORT"}</strong>
             <span class="badge asset">${escapeHtml(assetLabel(assetOfTrade(trade)))}</span>
+            <span class="badge ${strategyBadgeClass(strategyOfTrade(trade))}">${escapeHtml(strategyLabel(strategyOfTrade(trade)))}</span>
             <span class="badge ${escapeHtml(trade.account)}">${trade.account === "demo" ? "DEMO" : "LIVE"}</span>
             <span class="badge ${result}">${result === "win" ? "수익" : result === "loss" ? "손실" : "본전"}</span>
             <span class="badge">${formatDate(trade.date)}</span>
@@ -1160,6 +1195,7 @@ async function renderTrades() {
           <div><span>진입→청산</span><strong>${formatNumber(trade.entryPrice)} → ${formatNumber(trade.exitPrice)}</strong></div>
           <div><span>계약 수</span><strong>${formatNumber(trade.contracts, 3)}</strong></div>
           <div><span>복기 깊이</span><strong>${trade.reviewDepth === "deep" ? "심층" : trade.reviewDepth === "quick" ? "간단" : "정상"}</strong></div>
+          <div><span>전략</span><strong>${escapeHtml(strategyLabel(strategyOfTrade(trade)))}</strong></div>
         </div>
         <div class="trade-review-grid">
           <div class="review-box"><span>진입 이유</span><p>${escapeHtml(trade.tradeReason || "-")}</p></div>
