@@ -183,6 +183,7 @@
       <button class="tab active" data-view="analysis">오늘의 금 분석</button>
       <button class="tab" data-view="trades">거래 기록</button>
       <button class="tab" data-view="daily">일간 마감</button>
+      <button class="tab" data-view="weekly">주간 인출 · 리셋</button>
       <button class="tab" data-view="analytics">주·월간 통계</button>
       <button class="tab" data-view="settings">설정·백업</button>
     </nav>
@@ -358,30 +359,48 @@
             <input id="customAssetName" type="text" maxlength="30" placeholder="예: SOL, 은, S&P500" />
           </label>
 
-          <div class="field-grid four">
-            <label class="form-field"><span>진입 시간</span><input id="entryTime" type="time" /></label>
-            <label class="form-field"><span>청산 시간</span><input id="exitTime" type="time" /></label>
-            <label class="form-field"><span>계약 수 <small class="field-hint">최소 0.001</small></span><input id="contracts" type="number" min="0.001" step="0.001" value="1" inputmode="decimal" /></label>
-            <label class="form-field"><span>수수료</span><input id="fees" type="number" step="0.01" value="0" /></label>
+          <div id="tradeModeNotice" class="strategy-mode-banner ds-mode">DS TREND · 수동 매매 복기</div>
+
+          <div id="dsTradeFields">
+            <div class="field-grid five">
+              <label class="form-field"><span>진입 시간</span><input id="entryTime" type="time" /></label>
+              <label class="form-field"><span>청산 시간</span><input id="exitTime" type="time" /></label>
+              <label class="form-field"><span>계약 수 <small class="field-hint">최소 0.001</small></span><input id="contracts" type="number" min="0.001" step="0.001" value="1" inputmode="decimal" /></label>
+              <label class="form-field"><span>수수료 ($)</span><input id="fees" type="number" step="0.01" value="0" /></label>
+              <label class="form-field"><span>DS Trend 운용 시드</span><input id="dsSeed" type="number" min="0" step="0.01" placeholder="직접 입력" /></label>
+            </div>
+
+            <div class="field-grid four">
+              <label class="form-field"><span>진입 가격</span><input id="entryPrice" type="number" step="0.01" required /></label>
+              <label class="form-field"><span>손절 가격</span><input id="stopPrice" type="number" step="0.01" /></label>
+              <label class="form-field"><span>목표 가격</span><input id="targetPrice" type="number" step="0.01" /></label>
+              <label class="form-field"><span>청산 가격</span><input id="exitPrice" type="number" step="0.01" required /></label>
+            </div>
+
+            <div class="calculation-strip">
+              <div><span>예상 손익비</span><strong id="plannedRR">-</strong></div>
+              <div><span>실제 R</span><strong id="actualR">-</strong></div>
+              <div><span>보유 시간</span><strong id="durationValue">-</strong></div>
+              <div><span>예상 순손익</span><strong id="calculatedPnl">-</strong></div>
+            </div>
           </div>
 
-          <div class="field-grid four">
-            <label class="form-field"><span>진입 가격</span><input id="entryPrice" type="number" step="0.01" required /></label>
-            <label class="form-field"><span>손절 가격</span><input id="stopPrice" type="number" step="0.01" /></label>
-            <label class="form-field"><span>목표 가격</span><input id="targetPrice" type="number" step="0.01" /></label>
-            <label class="form-field"><span>청산 가격</span><input id="exitPrice" type="number" step="0.01" required /></label>
-          </div>
-
-          <div class="calculation-strip">
-            <div><span>예상 손익비</span><strong id="plannedRR">-</strong></div>
-            <div><span>실제 R</span><strong id="actualR">-</strong></div>
-            <div><span>보유 시간</span><strong id="durationValue">-</strong></div>
-            <div><span>예상 순손익</span><strong id="calculatedPnl">-</strong></div>
+          <div id="autoLogicFields" class="auto-logic-panel hidden">
+            <div class="auto-logic-head">
+              <div><strong>AUTO LOGIC SYSTEM</strong><span>가격 레벨 대신 프로그램의 실제 기동과 결과를 기록합니다.</span></div>
+              <span class="badge strategy-trend">AUTO</span>
+            </div>
+            <div class="field-grid three">
+              <label class="form-field"><span>기동 횟수</span><input id="activationCount" type="number" min="0" step="1" placeholder="예: 7" /></label>
+              <label class="form-field"><span>실현 순손익 ($)</span><input id="manualPnl" type="number" step="0.01" placeholder="수익 + / 손실 -" /></label>
+              <label class="form-field"><span>총 기동 시간 (분)</span><input id="autoRuntimeMinutes" type="number" min="0" step="1" placeholder="선택 입력" /></label>
+            </div>
+            <label class="form-field"><span>Auto Logic 운용 메모</span><textarea id="autoLogicNote" rows="4" placeholder="기동 조건, 중단 이유, 프로그램 상태, 특이사항 등을 기록"></textarea></label>
           </div>
 
           <label class="form-field">
-            <span>진입 이유</span>
-            <textarea id="tradeReason" rows="4" placeholder="왜 이 자리에서 진입했는가"></textarea>
+            <span>거래 / 운용 이유</span>
+            <textarea id="tradeReason" rows="4" placeholder="DS Trend의 진입 근거 또는 Auto Logic 운용 맥락"></textarea>
           </label>
 
           <div class="field-grid two">
@@ -483,6 +502,60 @@
           <label class="form-field"><span>오늘의 한 문장 결론</span><textarea id="dailyConclusion" rows="3"></textarea></label>
           <div class="form-actions"><button class="button primary" type="submit">일간 마감 저장</button></div>
         </form>
+      </div>
+    </section>
+
+    <section class="view" id="weeklyView">
+      <div class="section-card">
+        <div class="section-head split">
+          <div>
+            <p class="eyebrow">WEEKLY CAPITAL RESET</p>
+            <h2>주간 인출 · 심리 리셋</h2>
+            <p>금·토요일에 한 주의 손익을 확정하고, 수익의 탐욕과 손실의 자괴감에서 분리된 상태로 다음 주를 시작합니다.</p>
+          </div>
+          <label class="form-field compact-field"><span>점검일</span><input id="weeklyReviewDate" type="date" /></label>
+        </div>
+
+        <div id="weeklyDateWarning" class="weekly-date-warning hidden"></div>
+        <div id="weeklySummary" class="summary-grid"></div>
+
+        <form id="weeklyReviewForm" class="form-stack section-inner">
+          <input id="weeklyReviewId" type="hidden" />
+          <div class="weekly-result-banner" id="weeklyResultBanner">이번 주 결과를 계산합니다.</div>
+          <div class="field-grid three">
+            <label class="form-field"><span>이번 주 LIVE 순손익 ($)</span><input id="weeklyPnlValue" type="number" readonly /></label>
+            <label class="form-field"><span>이번 주 인출액 ($)</span><input id="weeklyWithdrawal" type="number" min="0" step="0.01" placeholder="수익 주에만 입력" /></label>
+            <label class="form-field"><span>인출 후 다음 주 운용 시드</span><input id="weeklyResetSeed" type="number" min="0" step="0.01" placeholder="직접 입력" /></label>
+          </div>
+          <p id="weeklyWithdrawalHint" class="muted"></p>
+
+          <div id="weeklyMindsetChecklist" class="weekly-mindset-checklist"></div>
+
+          <div class="field-grid two">
+            <label class="form-field"><span>이번 주 사실만 적기</span><textarea id="weeklyFact" rows="4" placeholder="평가나 감정이 아니라 실제로 일어난 거래·손익·규칙 준수 여부"></textarea></label>
+            <label class="form-field"><span>현재 감정 상태</span><textarea id="weeklyEmotion" rows="4" placeholder="흥분, 탐욕, 자신감 과잉, 자괴감, 복구 압박 등을 그대로 적기"></textarea></label>
+          </div>
+          <div class="field-grid two">
+            <label class="form-field"><span id="weeklyDistancingLabel">탐욕 / 자괴감과 거리두기</span><textarea id="weeklyDistancing" rows="4"></textarea></label>
+            <label class="form-field"><span>이번 주 규칙 점검</span><textarea id="weeklyDiscipline" rows="4" placeholder="손익이 아니라 프로세스 기준으로 잘한 것과 훼손한 것"></textarea></label>
+          </div>
+          <div class="field-grid two">
+            <label class="form-field"><span>다음 주 단 하나의 행동 원칙</span><textarea id="weeklyNextRule" rows="3"></textarea></label>
+            <label class="form-field"><span>리셋 선언</span><textarea id="weeklyResetStatement" rows="3" placeholder="이번 주 결과는 끝났다. 다음 주는 같은 규칙과 위험 한도로 다시 시작한다."></textarea></label>
+          </div>
+          <div class="form-actions">
+            <button class="button primary" type="submit">주간 기록 저장</button>
+            <button class="button ghost" id="weeklyResetButton" type="button">새 기록</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head split">
+          <div><h2>주간 인출 · 리셋 기록</h2><p>주별 순손익, 인출액, 심리 점검을 시간순으로 확인합니다.</p></div>
+          <strong id="weeklyTotalWithdrawals">누적 인출 $0.00</strong>
+        </div>
+        <div id="weeklyReviewList" class="weekly-review-list"></div>
       </div>
     </section>
 
