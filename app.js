@@ -28,9 +28,9 @@ const CAPITAL_LEVELS = [
 ];
 
 const TRADE_STRATEGIES = Object.freeze({
-  range_program: { label: "횡보로직 프로그램", badgeClass: "strategy-range" },
-  trend_program: { label: "추세로직 프로그램", badgeClass: "strategy-trend" },
-  ds_trend: { label: "DS Trend", badgeClass: "strategy-ds" },
+  range_program: { label: "횡보로직 프로그램", badgeClass: "strategy-range", mode: "auto" },
+  trend_program: { label: "추세로직 프로그램", badgeClass: "strategy-trend", mode: "auto" },
+  ds_trend: { label: "DS Trend", badgeClass: "strategy-ds", mode: "manual" },
   unspecified: { label: "전략 미지정", badgeClass: "strategy-unspecified" }
 });
 
@@ -50,6 +50,7 @@ const DEFAULT_STATE = {
   analyses: {},
   trades: [],
   dailyReviews: {},
+  weeklyReviews: [],
   strategyGoal: { text: "", color: "#f1c75b", updatedAt: null },
   tradingPrinciples: { items: [...DEFAULT_TRADING_PRINCIPLES], updatedAt: null },
   levelSystem: { unlockedLevel: 1, lastUnlockedAt: null },
@@ -108,7 +109,7 @@ window.addEventListener("unhandledrejection", (event) => {
 function validateCriticalDom() {
   const criticalIds = [
     "todayLabel", "analysisStatus", "activeAccountLabel",
-    "analysisView", "tradesView", "dailyView", "analyticsView", "settingsView",
+    "analysisView", "tradesView", "dailyView", "weeklyView", "analyticsView", "settingsView",
     "analysisDate", "analysisForm", "tradeForm", "dailyDate", "dailyReviewForm",
     "analyticsPeriod", "analyticsAccount", "storageWarning"
   ];
@@ -145,7 +146,8 @@ function loadState() {
       levelSystem: { ...DEFAULT_STATE.levelSystem, ...(parsed.levelSystem || {}) },
       analyses: parsed.analyses || {},
       trades: Array.isArray(parsed.trades) ? parsed.trades.map(normalizeTradeRecord) : [],
-      dailyReviews: parsed.dailyReviews || {}
+      dailyReviews: parsed.dailyReviews || {},
+      weeklyReviews: Array.isArray(parsed.weeklyReviews) ? parsed.weeklyReviews.map(normalizeWeeklyReview) : []
     };
   } catch (error) {
     console.error("상태 불러오기 실패", error);
@@ -318,13 +320,43 @@ function strategyBadgeClass(strategy) {
   return TRADE_STRATEGIES[normalizeTradeStrategy(strategy)]?.badgeClass || TRADE_STRATEGIES.unspecified.badgeClass;
 }
 
+function isAutoLogicStrategy(strategy) {
+  return TRADE_STRATEGIES[normalizeTradeStrategy(strategy)]?.mode === "auto";
+}
+
+function normalizeWeeklyReview(record) {
+  return {
+    id: record?.id || uid("weekly"),
+    date: record?.date || localDateString(),
+    weekStart: record?.weekStart || "",
+    weekEnd: record?.weekEnd || record?.date || "",
+    pnl: Number(record?.pnl || 0),
+    withdrawal: Math.max(0, Number(record?.withdrawal || 0)),
+    resetSeed: Math.max(0, Number(record?.resetSeed || 0)),
+    fact: String(record?.fact || ""),
+    emotion: String(record?.emotion || ""),
+    distancing: String(record?.distancing || ""),
+    discipline: String(record?.discipline || ""),
+    nextRule: String(record?.nextRule || ""),
+    resetStatement: String(record?.resetStatement || ""),
+    mindsetChecks: Array.isArray(record?.mindsetChecks) ? record.mindsetChecks : [],
+    createdAt: record?.createdAt || new Date().toISOString(),
+    updatedAt: record?.updatedAt || new Date().toISOString()
+  };
+}
+
 function normalizeTradeRecord(trade) {
   const asset = normalizeAssetKey(trade?.asset, trade?.customAssetName, trade?.symbol);
   return {
     ...trade,
     asset,
     strategy: normalizeTradeStrategy(trade?.strategy),
-    customAssetName: trade?.customAssetName || ""
+    customAssetName: trade?.customAssetName || "",
+    activationCount: Math.max(0, Number(trade?.activationCount || 0)),
+    manualPnl: Number(trade?.manualPnl ?? trade?.pnl ?? 0),
+    autoRuntimeMinutes: Math.max(0, Number(trade?.autoRuntimeMinutes || 0)),
+    autoLogicNote: String(trade?.autoLogicNote || ""),
+    dsSeed: Math.max(0, Number(trade?.dsSeed || 0))
   };
 }
 
@@ -366,8 +398,14 @@ function getMultiplier(symbol) {
 }
 
 function calculateTrade(form = null) {
-  const value = (id) => form ? Number(form[id] ?? 0) : Number($(id).value || 0);
-  const text = (id) => form ? String(form[id] ?? "") : $(id).value;
+  const value = (id) => form ? Number(form[id] ?? 0) : Number($(id)?.value || 0);
+  const text = (id) => form ? String(form[id] ?? "") : String($(id)?.value || "");
+  const strategy = normalizeTradeStrategy(text("tradeStrategy"));
+  if (isAutoLogicStrategy(strategy)) {
+    const pnl = value("manualPnl");
+    const duration = value("autoRuntimeMinutes") || null;
+    return { pnl, grossPnl: pnl, actualR: null, plannedRR: null, duration, multiplier: 0, riskAmount: 0 };
+  }
   const symbol = text("tradeSymbol");
   const direction = text("tradeDirection");
   const entry = value("entryPrice");
@@ -632,6 +670,7 @@ function setupTabs() {
     analysis: $("analysisView"),
     trades: $("tradesView"),
     daily: $("dailyView"),
+    weekly: $("weeklyView"),
     analytics: $("analyticsView"),
     settings: $("settingsView")
   };
@@ -641,6 +680,7 @@ function setupTabs() {
       Object.entries(views).forEach(([name, view]) => view.classList.toggle("active", name === tab.dataset.view));
       if (tab.dataset.view === "analytics") renderAnalytics();
       if (tab.dataset.view === "daily") renderDaily();
+      if (tab.dataset.view === "weekly") renderWeeklyReview();
       if (tab.dataset.view === "settings") renderDataStatus();
     });
   });
@@ -990,7 +1030,8 @@ function setupTradeForm() {
   $("tradeAccount").value = state.activeAccount === "live" ? "live" : "demo";
   $("tradeAsset").value = "GOLD";
   $("tradeStrategy").value = "ds_trend";
-  ["tradeSymbol", "tradeDirection", "tradeDate", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice"].forEach((id) => $(id).addEventListener("input", updateTradeCalculations));
+  ["tradeSymbol", "tradeDirection", "tradeDate", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice", "manualPnl", "autoRuntimeMinutes"].forEach((id) => $(id)?.addEventListener("input", updateTradeCalculations));
+  $("tradeStrategy").addEventListener("change", () => { updateTradeMode(); updateTradeCalculations(); });
   $("tradeAsset").addEventListener("change", () => updateAssetFieldVisibility(true));
   $("tradeSymbol").addEventListener("change", syncAssetFromSymbol);
   $("tradeForm").addEventListener("submit", saveTrade);
@@ -1005,7 +1046,24 @@ function setupTradeForm() {
   $("tradeSearch").addEventListener("input", renderTrades);
   updateAssetFieldVisibility(false);
   updateReviewDepth();
+  updateTradeMode();
   updateTradeCalculations();
+}
+
+function updateTradeMode() {
+  const strategy = normalizeTradeStrategy($("tradeStrategy")?.value);
+  const auto = isAutoLogicStrategy(strategy);
+  $("dsTradeFields")?.classList.toggle("hidden", auto);
+  $("autoLogicFields")?.classList.toggle("hidden", !auto);
+  const notice = $("tradeModeNotice");
+  if (notice) {
+    notice.className = `strategy-mode-banner ${auto ? "auto-mode" : "ds-mode"}`;
+    notice.textContent = auto
+      ? `${strategyLabel(strategy).toUpperCase()} · AUTO LOGIC · 기동 횟수와 실현 순손익 중심 기록`
+      : "DS TREND · 진입/손절/목표/청산 + 운용 시드 기록";
+  }
+  ["entryPrice", "exitPrice"].forEach((id) => { if ($(id)) $(id).required = !auto; });
+  if ($("manualPnl")) $("manualPnl").required = auto;
 }
 
 function updateReviewDepth() {
@@ -1025,7 +1083,7 @@ function updateTradeCalculations() {
 }
 
 function tradeFieldIds() {
-  return ["tradeAccount", "tradeDate", "tradeStrategy", "tradeSymbol", "tradeDirection", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice", "reviewDepth", "tradeReason", "tradeStrengths", "tradeMistakes", "nextAction", "psychology", "tradeReview", "frameworkTags", "timeframes", "analysisScore", "executionScore", "emotionScore"];
+  return ["tradeAccount", "tradeDate", "tradeStrategy", "tradeSymbol", "tradeDirection", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice", "dsSeed", "activationCount", "manualPnl", "autoRuntimeMinutes", "autoLogicNote", "reviewDepth", "tradeReason", "tradeStrengths", "tradeMistakes", "nextAction", "psychology", "tradeReview", "frameworkTags", "timeframes", "analysisScore", "executionScore", "emotionScore"];
 }
 
 async function saveTrade(event) {
@@ -1096,6 +1154,7 @@ function resetTradeForm() {
   renderPendingImages($("tradeImageList"), [], "trade");
   updateAssetFieldVisibility(false);
   updateReviewDepth();
+  updateTradeMode();
   updateTradeCalculations();
 }
 
@@ -1115,6 +1174,7 @@ async function editTrade(id) {
   $("tradeAsset").value = isStandardAsset ? savedAsset : "CUSTOM";
   $("customAssetName").value = isStandardAsset ? "" : savedAsset;
   updateAssetFieldVisibility(false);
+  updateTradeMode();
   $("followedPlan").checked = Boolean(trade.followedPlan);
   $("ruleViolation").checked = Boolean(trade.ruleViolation);
   $("revengeTrade").checked = Boolean(trade.revengeTrade);
@@ -1157,7 +1217,7 @@ async function renderTrades() {
     .filter((trade) => (resultFilter === "all" || resultOfTrade(trade) === resultFilter))
     .filter((trade) => {
       if (!query) return true;
-      return [assetLabel(assetOfTrade(trade)), strategyLabel(strategyOfTrade(trade)), trade.symbol, trade.tradeReason, trade.tradeReview, trade.tradeStrengths, trade.tradeMistakes, trade.nextAction, trade.psychology, ...(trade.frameworkTags || [])].join(" ").toLowerCase().includes(query);
+      return [assetLabel(assetOfTrade(trade)), strategyLabel(strategyOfTrade(trade)), trade.symbol, trade.tradeReason, trade.tradeReview, trade.tradeStrengths, trade.tradeMistakes, trade.nextAction, trade.psychology, trade.autoLogicNote, ...(trade.frameworkTags || [])].join(" ").toLowerCase().includes(query);
     })
     .sort((a, b) => `${b.date} ${b.entryTime || ""}`.localeCompare(`${a.date} ${a.entryTime || ""}`));
 
@@ -1189,14 +1249,22 @@ async function renderTrades() {
         </div>
         <div class="trade-metrics">
           <div><span>순손익</span><strong style="color:${trade.pnl > 0 ? "var(--green)" : trade.pnl < 0 ? "var(--red)" : "inherit"}">${formatMoney(trade.pnl)}</strong></div>
-          <div><span>실제 R</span><strong>${trade.actualR == null ? "-" : `${formatNumber(trade.actualR,2)}R`}</strong></div>
-          <div><span>계획 손익비</span><strong>${trade.plannedRR == null ? "-" : `1:${formatNumber(trade.plannedRR,2)}`}</strong></div>
-          <div><span>보유 시간</span><strong>${formatDuration(trade.durationMinutes)}</strong></div>
-          <div><span>진입→청산</span><strong>${formatNumber(trade.entryPrice)} → ${formatNumber(trade.exitPrice)}</strong></div>
-          <div><span>계약 수</span><strong>${formatNumber(trade.contracts, 3)}</strong></div>
+          ${isAutoLogicStrategy(strategyOfTrade(trade)) ? `
+            <div><span>기동 횟수</span><strong>${formatNumber(trade.activationCount || 0, 0)}회</strong></div>
+            <div><span>총 기동 시간</span><strong>${trade.autoRuntimeMinutes ? formatDuration(trade.autoRuntimeMinutes) : "-"}</strong></div>
+            <div><span>기록 방식</span><strong>AUTO LOGIC</strong></div>
+          ` : `
+            <div><span>실제 R</span><strong>${trade.actualR == null ? "-" : `${formatNumber(trade.actualR,2)}R`}</strong></div>
+            <div><span>계획 손익비</span><strong>${trade.plannedRR == null ? "-" : `1:${formatNumber(trade.plannedRR,2)}`}</strong></div>
+            <div><span>보유 시간</span><strong>${formatDuration(trade.durationMinutes)}</strong></div>
+            <div><span>진입→청산</span><strong>${formatNumber(trade.entryPrice)} → ${formatNumber(trade.exitPrice)}</strong></div>
+            <div><span>계약 수</span><strong>${formatNumber(trade.contracts, 3)}</strong></div>
+            <div><span>DS 시드</span><strong>${trade.dsSeed ? formatNumber(trade.dsSeed, 2) : "-"}</strong></div>
+          `}
           <div><span>복기 깊이</span><strong>${trade.reviewDepth === "deep" ? "심층" : trade.reviewDepth === "quick" ? "간단" : "정상"}</strong></div>
           <div><span>전략</span><strong>${escapeHtml(strategyLabel(strategyOfTrade(trade)))}</strong></div>
         </div>
+        ${isAutoLogicStrategy(strategyOfTrade(trade)) && trade.autoLogicNote ? `<div class="review-box auto-note"><span>AUTO LOGIC 운용 메모</span><p>${escapeHtml(trade.autoLogicNote)}</p></div>` : ""}
         <div class="trade-review-grid">
           <div class="review-box"><span>진입 이유</span><p>${escapeHtml(trade.tradeReason || "-")}</p></div>
           <div class="review-box"><span>거래 복기</span><p>${escapeHtml(trade.tradeReview || "-")}</p></div>
@@ -2077,6 +2145,184 @@ function closeImageViewer() {
   document.body.style.overflow = "";
 }
 
+function weekStartMonday(dateString) {
+  const d = new Date(`${dateString}T12:00:00`);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return localDateString(d);
+}
+
+function weeklyTradesForDate(reviewDate) {
+  const start = weekStartMonday(reviewDate);
+  return state.trades.filter((trade) => trade.account === "live" && trade.date >= start && trade.date <= reviewDate);
+}
+
+function weeklyPnlForDate(reviewDate) {
+  return weeklyTradesForDate(reviewDate).reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
+}
+
+function weeklyResultType(pnl) {
+  return pnl > 0 ? "profit" : pnl < 0 ? "loss" : "flat";
+}
+
+function renderWeeklyMindset(pnl, selected = []) {
+  const type = weeklyResultType(pnl);
+  const items = type === "profit" ? [
+    "이번 주 수익이 다음 주 위험 한도를 키울 이유가 아니다.",
+    "더 크게 벌어야 한다는 욕심 때문에 거래 빈도나 규모를 늘리지 않는다.",
+    "인출은 성과 확정이지 자신감 레버리지가 아니다.",
+    "다음 주도 같은 조건·같은 규칙에서만 거래한다."
+  ] : type === "loss" ? [
+    "이번 주 손실을 만회하기 위해 다음 주 거래 규모를 늘리지 않는다.",
+    "손실 금액을 내 능력이나 가치와 동일시하지 않는다.",
+    "복수매매·조급한 진입 없이 정상적인 셋업만 기다린다.",
+    "손실의 원인이 규칙 위반인지 정상적인 확률 손실인지 분리해서 본다."
+  ] : [
+    "본전 주간도 결과를 억지로 만들 필요가 없다.",
+    "거래하지 않은 것도 규칙을 지킨 결정일 수 있다.",
+    "다음 주 결과를 미리 기대하지 않고 조건만 본다.",
+    "거래 규모와 위험 한도를 그대로 유지한다."
+  ];
+  const wrap = $("weeklyMindsetChecklist");
+  if (!wrap) return;
+  wrap.innerHTML = `<div class="weekly-mindset-title">${type === "profit" ? "수익 주 · 탐욕 리셋" : type === "loss" ? "손실 주 · 자괴감 리셋" : "본전 주 · 중립 리셋"}</div>` + items.map((text, index) => {
+    const checked = selected.includes(index);
+    return `<label class="weekly-check"><input type="checkbox" data-weekly-mindset="${index}" ${checked ? "checked" : ""}/><span>${escapeHtml(text)}</span></label>`;
+  }).join("");
+  $("weeklyDistancingLabel").textContent = type === "profit" ? "탐욕과 거리두기" : type === "loss" ? "자괴감과 거리두기" : "결과와 거리두기";
+}
+
+function updateWeeklyReviewContext(selectedChecks = null) {
+  const date = $("weeklyReviewDate")?.value || localDateString();
+  const pnl = weeklyPnlForDate(date);
+  const trades = weeklyTradesForDate(date);
+  const start = weekStartMonday(date);
+  $("weeklyPnlValue").value = pnl.toFixed(2);
+  const withdrawal = $("weeklyWithdrawal");
+  if (withdrawal) {
+    withdrawal.disabled = pnl <= 0;
+    if (pnl <= 0) withdrawal.value = "0";
+  }
+  const type = weeklyResultType(pnl);
+  const banner = $("weeklyResultBanner");
+  banner.className = `weekly-result-banner ${type}`;
+  banner.textContent = type === "profit" ? `수익 주간 · ${formatMoney(pnl)} · 인출 가능` : type === "loss" ? `손실 주간 · ${formatMoney(pnl)} · 인출 없음` : `본전 주간 · ${formatMoney(pnl)} · 인출 없음`;
+  $("weeklyWithdrawalHint").textContent = pnl > 0 ? "이번 주 순손익이 양수이므로 인출액을 직접 기록할 수 있습니다." : "이번 주 순손익이 0 이하이므로 인출액은 자동으로 0으로 고정됩니다.";
+  const day = new Date(`${date}T12:00:00`).getDay();
+  const warning = $("weeklyDateWarning");
+  if (day === 5 || day === 6) {
+    warning.classList.add("hidden");
+  } else {
+    warning.textContent = "권장 점검일은 금요일 또는 토요일입니다. 기록은 가능하지만 주간 리셋 루틴은 금·토에 실행하는 것을 기준으로 합니다.";
+    warning.classList.remove("hidden");
+  }
+  renderWeeklyMindset(pnl, selectedChecks || [...document.querySelectorAll('[data-weekly-mindset]:checked')].map(el => Number(el.dataset.weeklyMindset)));
+  $("weeklySummary").innerHTML = [
+    ["점검 기간", `${formatDate(start)} → ${formatDate(date)}`],
+    ["LIVE 거래", `${trades.length}건`],
+    ["주간 순손익", formatMoney(pnl)],
+    ["수익 거래", `${trades.filter(t => Number(t.pnl) > 0).length}건`]
+  ].map(([label,value]) => `<div class="summary-card"><span>${label}</span><strong>${value}</strong></div>`).join("");
+}
+
+function setupWeeklyReview() {
+  $("weeklyReviewDate").value = localDateString();
+  $("weeklyReviewDate").addEventListener("change", () => updateWeeklyReviewContext([]));
+  $("weeklyReviewForm").addEventListener("submit", saveWeeklyReview);
+  $("weeklyResetButton").addEventListener("click", resetWeeklyReviewForm);
+  updateWeeklyReviewContext([]);
+  renderWeeklyReview();
+}
+
+function saveWeeklyReview(event) {
+  event.preventDefault();
+  const date = $("weeklyReviewDate").value || localDateString();
+  const pnl = weeklyPnlForDate(date);
+  const id = $("weeklyReviewId").value || uid("weekly");
+  const index = state.weeklyReviews.findIndex(r => r.id === id);
+  const previous = index >= 0 ? state.weeklyReviews[index] : {};
+  const record = normalizeWeeklyReview({
+    ...previous,
+    id,
+    date,
+    weekStart: weekStartMonday(date),
+    weekEnd: date,
+    pnl,
+    withdrawal: pnl > 0 ? Number($("weeklyWithdrawal").value || 0) : 0,
+    resetSeed: Number($("weeklyResetSeed").value || 0),
+    fact: $("weeklyFact").value.trim(),
+    emotion: $("weeklyEmotion").value.trim(),
+    distancing: $("weeklyDistancing").value.trim(),
+    discipline: $("weeklyDiscipline").value.trim(),
+    nextRule: $("weeklyNextRule").value.trim(),
+    resetStatement: $("weeklyResetStatement").value.trim(),
+    mindsetChecks: [...document.querySelectorAll('[data-weekly-mindset]:checked')].map(el => Number(el.dataset.weeklyMindset)),
+    createdAt: previous.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  if (index >= 0) state.weeklyReviews[index] = record; else state.weeklyReviews.push(record);
+  saveState();
+  resetWeeklyReviewForm();
+  renderWeeklyReview();
+  notify(index >= 0 ? "주간 기록을 수정했습니다." : "주간 인출 · 리셋 기록을 저장했습니다.");
+}
+
+function resetWeeklyReviewForm() {
+  $("weeklyReviewForm").reset();
+  $("weeklyReviewId").value = "";
+  $("weeklyReviewDate").value = localDateString();
+  updateWeeklyReviewContext([]);
+}
+
+function editWeeklyReview(id) {
+  const record = state.weeklyReviews.find(r => r.id === id);
+  if (!record) return;
+  $("weeklyReviewId").value = record.id;
+  $("weeklyReviewDate").value = record.date;
+  updateWeeklyReviewContext(record.mindsetChecks || []);
+  if (record.pnl > 0) $("weeklyWithdrawal").value = record.withdrawal || 0;
+  $("weeklyResetSeed").value = record.resetSeed || "";
+  $("weeklyFact").value = record.fact || "";
+  $("weeklyEmotion").value = record.emotion || "";
+  $("weeklyDistancing").value = record.distancing || "";
+  $("weeklyDiscipline").value = record.discipline || "";
+  $("weeklyNextRule").value = record.nextRule || "";
+  $("weeklyResetStatement").value = record.resetStatement || "";
+  window.scrollTo({ top: $("weeklyReviewForm").getBoundingClientRect().top + window.scrollY - 110, behavior: "smooth" });
+}
+
+async function deleteWeeklyReview(id) {
+  const accepted = await confirmAction("주간 기록 삭제", "이 주간 인출 · 심리 리셋 기록을 삭제합니다.");
+  if (!accepted) return;
+  state.weeklyReviews = state.weeklyReviews.filter(r => r.id !== id);
+  saveState();
+  renderWeeklyReview();
+}
+
+function renderWeeklyReview() {
+  if (!$("weeklyReviewList")) return;
+  updateWeeklyReviewContext();
+  const records = [...state.weeklyReviews].sort((a,b) => b.date.localeCompare(a.date));
+  const totalWithdrawals = records.reduce((sum,r) => sum + Number(r.withdrawal || 0), 0);
+  $("weeklyTotalWithdrawals").textContent = `누적 인출 ${formatMoney(totalWithdrawals)}`;
+  if (!records.length) {
+    $("weeklyReviewList").innerHTML = '<div class="empty-state">아직 저장된 주간 기록이 없습니다.</div>';
+    return;
+  }
+  $("weeklyReviewList").innerHTML = records.map(record => {
+    const type = weeklyResultType(record.pnl);
+    return `<article class="weekly-review-card ${type}">
+      <div class="weekly-review-head"><div><strong>${formatDate(record.weekStart)} → ${formatDate(record.weekEnd)}</strong><span>${type === "profit" ? "수익 주" : type === "loss" ? "손실 주" : "본전 주"}</span></div><div class="trade-actions"><button class="icon-button" type="button" data-edit-weekly="${record.id}">✎</button><button class="icon-button" type="button" data-delete-weekly="${record.id}">×</button></div></div>
+      <div class="weekly-review-metrics"><div><span>주간 순손익</span><strong>${formatMoney(record.pnl)}</strong></div><div><span>인출액</span><strong>${formatMoney(record.withdrawal)}</strong></div><div><span>다음 주 시드</span><strong>${record.resetSeed ? formatNumber(record.resetSeed,2) : "-"}</strong></div></div>
+      <div class="trade-review-grid"><div class="review-box"><span>이번 주 사실</span><p>${escapeHtml(record.fact || "-")}</p></div><div class="review-box"><span>감정 상태</span><p>${escapeHtml(record.emotion || "-")}</p></div><div class="review-box"><span>거리두기</span><p>${escapeHtml(record.distancing || "-")}</p></div><div class="review-box"><span>다음 주 한 가지</span><p>${escapeHtml(record.nextRule || "-")}</p></div></div>
+      ${record.resetStatement ? `<div class="weekly-reset-statement">${escapeHtml(record.resetStatement)}</div>` : ""}
+    </article>`;
+  }).join("");
+  $$('[data-edit-weekly]', $("weeklyReviewList")).forEach(btn => btn.addEventListener("click", () => editWeeklyReview(btn.dataset.editWeekly)));
+  $$('[data-delete-weekly]', $("weeklyReviewList")).forEach(btn => btn.addEventListener("click", () => deleteWeeklyReview(btn.dataset.deleteWeekly)));
+}
+
 function setupSettings() {
   $("gcMultiplier").value = state.settings.gcMultiplier;
   $("mgcMultiplier").value = state.settings.mgcMultiplier;
@@ -2106,6 +2352,7 @@ async function renderDataStatus() {
     ["시장 분석", `${Object.keys(state.analyses).length}일`],
     ["거래 기록", `${state.trades.length}건`],
     ["일간 마감", `${Object.keys(state.dailyReviews).length}일`],
+    ["주간 리셋", `${state.weeklyReviews.length}건`],
     ["저장 이미지", `${imageCount}장`]
   ].map(([label,value]) => `<div class="summary-card"><span>${label}</span><strong>${value}</strong></div>`).join("");
 }
@@ -2137,7 +2384,8 @@ async function importBackup(event) {
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(payload.state.strategyGoal || {}) },
       tradingPrinciples: normalizeTradingPrinciples(payload.state.tradingPrinciples),
       levelSystem: { ...DEFAULT_STATE.levelSystem, ...(payload.state.levelSystem || {}) },
-      trades: Array.isArray(payload.state.trades) ? payload.state.trades.map(normalizeTradeRecord) : []
+      trades: Array.isArray(payload.state.trades) ? payload.state.trades.map(normalizeTradeRecord) : [],
+      weeklyReviews: Array.isArray(payload.state.weeklyReviews) ? payload.state.weeklyReviews.map(normalizeWeeklyReview) : []
     };
     syncLevelSystemState();
     await clearImages();
@@ -2152,7 +2400,7 @@ async function importBackup(event) {
 }
 
 async function clearAllData() {
-  const accepted = await confirmAction("전체 데이터 삭제", "시장 분석, 거래, 일간 마감, 업로드 이미지가 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다.");
+  const accepted = await confirmAction("전체 데이터 삭제", "시장 분석, 거래, 일간 마감, 주간 인출·리셋, 업로드 이미지가 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다.");
   if (!accepted) return;
   state = cloneDefaultState();
   localStorage.removeItem(STORAGE_KEY);
@@ -2210,6 +2458,7 @@ async function init() {
   safeRun("금 분석 초기화", setupAnalysis);
   safeRun("거래 기록 초기화", setupTradeForm);
   safeRun("일간 마감 초기화", setupDaily);
+  safeRun("주간 인출·리셋 초기화", setupWeeklyReview);
   safeRun("통계 초기화", setupAnalytics);
   safeRun("설정·백업 초기화", setupSettings);
   safeRun("모달 초기화", setupModals);
