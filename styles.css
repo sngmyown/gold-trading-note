@@ -1092,3 +1092,42 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
   .trading-principle-item { grid-template-columns: 36px minmax(0,1fr); padding: 10px; }
   .trading-principle-item::before { width: 34px; height: 34px; }
 }
+
+
+/* ── V12: strategy-specific trade entry + weekly reset ── */
+.field-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.strategy-mode-banner { border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; }
+.strategy-mode-banner.ds-mode { color:#f1c75b; background:rgba(241,199,91,.07); border-color:rgba(241,199,91,.22); }
+.strategy-mode-banner.auto-mode { color:#44d48b; background:rgba(68,212,139,.07); border-color:rgba(68,212,139,.22); }
+.auto-logic-panel { border:1px solid rgba(68,212,139,.2); background:rgba(68,212,139,.035); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:14px; }
+.auto-logic-panel.hidden { display:none; }
+.auto-logic-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; border-bottom:1px solid var(--border); padding-bottom:12px; }
+.auto-logic-head div { display:flex; flex-direction:column; gap:3px; }
+.auto-logic-head strong { color:var(--green); font-family:var(--mono); font-size:12px; }
+.auto-logic-head span { color:var(--muted); font-size:11px; }
+.review-box.auto-note { margin-top:10px; border-color:rgba(68,212,139,.18); }
+.weekly-date-warning { padding:10px 14px; margin-bottom:14px; border-radius:9px; border:1px solid rgba(241,199,91,.25); color:#f1c75b; background:rgba(241,199,91,.06); font-size:12px; }
+.weekly-result-banner { border:1px solid var(--border); border-radius:12px; padding:13px 15px; font-weight:800; font-family:var(--mono); }
+.weekly-result-banner.profit { color:var(--green); border-color:rgba(68,212,139,.3); background:rgba(68,212,139,.06); }
+.weekly-result-banner.loss { color:var(--red); border-color:rgba(255,115,115,.3); background:rgba(255,115,115,.06); }
+.weekly-result-banner.flat { color:var(--muted); background:var(--panel-2); }
+.weekly-mindset-checklist { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--panel-2); }
+.weekly-mindset-title { grid-column:1/-1; font-family:var(--mono); font-size:11px; font-weight:800; color:var(--yellow); margin-bottom:2px; }
+.weekly-check { display:flex; gap:9px; align-items:flex-start; color:var(--text); font-size:12px; line-height:1.55; padding:8px 9px; border-radius:8px; background:rgba(255,255,255,.018); }
+.weekly-check input { margin-top:3px; accent-color:var(--green); }
+.weekly-review-list { display:flex; flex-direction:column; gap:12px; }
+.weekly-review-card { border:1px solid var(--border); border-radius:14px; padding:16px; background:var(--panel-2); }
+.weekly-review-card.profit { border-left:3px solid var(--green); }
+.weekly-review-card.loss { border-left:3px solid var(--red); }
+.weekly-review-card.flat { border-left:3px solid var(--muted); }
+.weekly-review-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+.weekly-review-head > div:first-child { display:flex; flex-direction:column; gap:3px; }
+.weekly-review-head strong { font-family:var(--mono); font-size:13px; }
+.weekly-review-head span { color:var(--muted); font-size:11px; }
+.weekly-review-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+.weekly-review-metrics div { border:1px solid var(--border); border-radius:9px; padding:10px; display:flex; flex-direction:column; gap:4px; }
+.weekly-review-metrics span { color:var(--muted); font-size:10px; }
+.weekly-review-metrics strong { font-family:var(--mono); }
+.weekly-reset-statement { margin-top:12px; padding:11px 13px; border-radius:9px; border:1px solid rgba(101,169,255,.2); background:rgba(101,169,255,.05); color:#b9d7ff; font-size:12px; line-height:1.65; white-space:pre-wrap; }
+@media (max-width: 1100px) { .field-grid.five { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width: 720px) { .weekly-mindset-checklist, .weekly-review-metrics { grid-template-columns:1fr; } .field-grid.five { grid-template-columns:1fr; } }
