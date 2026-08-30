@@ -352,6 +352,10 @@ function isAutoLogicStrategy(strategy) {
   return TRADE_STRATEGIES[normalizeTradeStrategy(strategy)]?.mode === "auto";
 }
 
+function isDualTradeMode(value) {
+  return String(value || "").trim().toLowerCase() === "both";
+}
+
 function normalizeWeeklyReview(record) {
   return {
     id: record?.id || uid("weekly"),
@@ -425,15 +429,9 @@ function getMultiplier(symbol) {
   return Number(state.settings.customMultiplier) || 1;
 }
 
-function calculateTrade(form = null) {
+function calculateDsTrade(form = null) {
   const value = (id) => form ? Number(form[id] ?? 0) : Number($(id)?.value || 0);
   const text = (id) => form ? String(form[id] ?? "") : String($(id)?.value || "");
-  const strategy = normalizeTradeStrategy(text("tradeStrategy"));
-  if (isAutoLogicStrategy(strategy)) {
-    const pnl = value("manualPnl");
-    const duration = value("autoRuntimeMinutes") || null;
-    return { pnl, grossPnl: pnl, actualR: null, plannedRR: null, duration, multiplier: 0, riskAmount: 0 };
-  }
   const symbol = text("tradeSymbol");
   const direction = text("tradeDirection");
   const entry = value("entryPrice");
@@ -454,6 +452,21 @@ function calculateTrade(form = null) {
   const plannedRR = riskDistance > 0 ? rewardDistance / riskDistance : null;
   const duration = calculateDuration(text("tradeDate"), text("entryTime"), text("exitTime"));
   return { pnl, grossPnl, actualR, plannedRR, duration, multiplier, riskAmount };
+}
+
+function calculateAutoLogicTrade(form = null) {
+  const value = (id) => form ? Number(form[id] ?? 0) : Number($(id)?.value || 0);
+  const pnl = value("manualPnl");
+  const duration = value("autoRuntimeMinutes") || null;
+  return { pnl, grossPnl: pnl, actualR: null, plannedRR: null, duration, multiplier: 0, riskAmount: 0 };
+}
+
+function calculateTrade(form = null) {
+  const text = (id) => form ? String(form[id] ?? "") : String($(id)?.value || "");
+  const rawStrategy = text("tradeStrategy");
+  if (isDualTradeMode(rawStrategy)) return calculateDsTrade(form);
+  const strategy = normalizeTradeStrategy(rawStrategy);
+  return isAutoLogicStrategy(strategy) ? calculateAutoLogicTrade(form) : calculateDsTrade(form);
 }
 
 function calculateDuration(date, entryTime, exitTime) {
@@ -1173,9 +1186,11 @@ function setupTradeForm() {
   $("tradeDate").value = localDateString();
   $("tradeAccount").value = state.activeAccount === "live" ? "live" : "demo";
   $("tradeAsset").value = "GOLD";
-  $("tradeStrategy").value = "ds_trend";
+  $("tradeStrategy").value = "both";
+  if ($("autoLogicStrategyType")) $("autoLogicStrategyType").value = "range_program";
   ["tradeSymbol", "tradeDirection", "tradeDate", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice", "manualPnl", "autoRuntimeMinutes"].forEach((id) => $(id)?.addEventListener("input", updateTradeCalculations));
   $("tradeStrategy").addEventListener("change", () => { updateTradeMode(); updateTradeCalculations(); });
+  $("autoLogicStrategyType")?.addEventListener("change", updateTradeMode);
   $("tradeAsset").addEventListener("change", () => updateAssetFieldVisibility(true));
   $("tradeSymbol").addEventListener("change", syncAssetFromSymbol);
   $("tradeForm").addEventListener("submit", saveTrade);
@@ -1195,19 +1210,27 @@ function setupTradeForm() {
 }
 
 function updateTradeMode() {
-  const strategy = normalizeTradeStrategy($("tradeStrategy")?.value);
-  const auto = isAutoLogicStrategy(strategy);
-  $("dsTradeFields")?.classList.toggle("hidden", auto);
-  $("autoLogicFields")?.classList.toggle("hidden", !auto);
+  const raw = String($("tradeStrategy")?.value || "");
+  const dual = isDualTradeMode(raw);
+  const strategy = normalizeTradeStrategy(raw);
+  const autoOnly = !dual && isAutoLogicStrategy(strategy);
+  const showDs = dual || !autoOnly;
+  const showAuto = dual || autoOnly;
+  $("dsTradeFields")?.classList.toggle("hidden", !showDs);
+  $("autoLogicFields")?.classList.toggle("hidden", !showAuto);
+  $("autoLogicStrategyField")?.classList.toggle("hidden", !dual);
+  if (!dual && autoOnly && $("autoLogicStrategyType")) $("autoLogicStrategyType").value = strategy;
   const notice = $("tradeModeNotice");
   if (notice) {
-    notice.className = `strategy-mode-banner ${auto ? "auto-mode" : "ds-mode"}`;
-    notice.textContent = auto
-      ? `${strategyLabel(strategy).toUpperCase()} · AUTO LOGIC · 기동 횟수와 실현 순손익 중심 기록`
-      : "DS TREND · 진입/손절/목표/청산 + 운용 시드 기록";
+    notice.className = `strategy-mode-banner ${dual ? "dual-mode" : autoOnly ? "auto-mode" : "ds-mode"}`;
+    notice.textContent = dual
+      ? "DUAL ACCOUNT · DS TREND + AUTO LOGIC · 두 계좌 정보를 한 번에 입력하고 각각의 기록으로 저장"
+      : autoOnly
+        ? `${strategyLabel(strategy).toUpperCase()} · AUTO LOGIC · 기동 횟수와 실현 순손익 중심 기록`
+        : "DS TREND · 진입/손절/목표/청산 + 운용 시드 기록";
   }
-  ["entryPrice", "exitPrice"].forEach((id) => { if ($(id)) $(id).required = !auto; });
-  if ($("manualPnl")) $("manualPnl").required = auto;
+  ["entryPrice", "exitPrice"].forEach((id) => { if ($(id)) $(id).required = showDs; });
+  if ($("manualPnl")) $("manualPnl").required = showAuto;
 }
 
 function updateReviewDepth() {
@@ -1230,17 +1253,11 @@ function tradeFieldIds() {
   return ["tradeAccount", "tradeDate", "tradeStrategy", "tradeSymbol", "tradeDirection", "entryTime", "exitTime", "contracts", "fees", "entryPrice", "stopPrice", "targetPrice", "exitPrice", "dsSeed", "activationCount", "manualPnl", "autoRuntimeMinutes", "autoLogicNote", "reviewDepth", "tradeReason", "tradeStrengths", "tradeMistakes", "nextAction", "psychology", "tradeReview", "frameworkTags", "timeframes", "analysisScore", "executionScore", "emotionScore"];
 }
 
-async function saveTrade(event) {
-  event.preventDefault();
-  const id = $("tradeId").value || uid("trade");
-  const existingIndex = state.trades.findIndex((trade) => trade.id === id);
-  const previous = existingIndex >= 0 ? state.trades[existingIndex] : {};
-  const uploadedIds = await persistPendingImages(pendingTradeImages, { ownerType: "trade", ownerId: id });
-  const calc = calculateTrade();
+function buildTradeFromForm({ id, previous = {}, strategy, calc, imageIds = [], pairId = "" }) {
   const trade = {
     ...previous,
     id,
-    imageIds: [...currentTradeImageIds, ...uploadedIds],
+    imageIds,
     followedPlan: $("followedPlan").checked,
     ruleViolation: $("ruleViolation").checked,
     revengeTrade: $("revengeTrade").checked,
@@ -1252,6 +1269,7 @@ async function saveTrade(event) {
     durationMinutes: calc.duration,
     riskAmount: calc.riskAmount,
     multiplier: calc.multiplier,
+    pairId,
     createdAt: previous.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -1261,10 +1279,84 @@ async function saveTrade(event) {
     const input = $(field);
     trade[key] = input.type === "number" ? Number(input.value || 0) : input.value.trim();
   });
+  trade.strategy = normalizeTradeStrategy(strategy);
   trade.frameworkTags = splitTags($("frameworkTags").value);
   trade.timeframes = splitTags($("timeframes").value);
   trade.customAssetName = $("customAssetName").value.trim();
   trade.asset = normalizeAssetKey($("tradeAsset").value, trade.customAssetName, trade.symbol);
+
+  if (isAutoLogicStrategy(trade.strategy)) {
+    trade.entryTime = "";
+    trade.exitTime = "";
+    trade.contracts = 0;
+    trade.fees = 0;
+    trade.entryPrice = 0;
+    trade.stopPrice = 0;
+    trade.targetPrice = 0;
+    trade.exitPrice = 0;
+    trade.dsSeed = 0;
+  } else {
+    trade.activationCount = 0;
+    trade.manualPnl = 0;
+    trade.autoRuntimeMinutes = 0;
+    trade.autoLogicNote = "";
+  }
+  return trade;
+}
+
+async function saveTrade(event) {
+  event.preventDefault();
+  const rawMode = String($("tradeStrategy").value || "");
+  const dual = isDualTradeMode(rawMode);
+  const editingId = $("tradeId").value;
+  if (dual && editingId) {
+    notify("기존 기록 수정은 한 계좌씩 처리합니다. 새 동시 기록은 초기화 후 저장하세요.");
+    return;
+  }
+
+  const uploadedIds = await persistPendingImages(pendingTradeImages, { ownerType: "trade", ownerId: editingId || uid("trade_upload") });
+  const allImageIds = [...currentTradeImageIds, ...uploadedIds];
+
+  if (dual) {
+    const pairId = uid("dual");
+    const dsId = uid("trade");
+    const autoId = uid("trade");
+    const autoStrategy = isAutoLogicStrategy($("autoLogicStrategyType")?.value)
+      ? normalizeTradeStrategy($("autoLogicStrategyType").value)
+      : "range_program";
+    const dsTrade = buildTradeFromForm({
+      id: dsId,
+      strategy: "ds_trend",
+      calc: calculateDsTrade(),
+      imageIds: allImageIds,
+      pairId
+    });
+    const autoTrade = buildTradeFromForm({
+      id: autoId,
+      strategy: autoStrategy,
+      calc: calculateAutoLogicTrade(),
+      imageIds: [],
+      pairId
+    });
+    dsTrade.linkedRecordId = autoId;
+    autoTrade.linkedRecordId = dsId;
+    state.trades.push(dsTrade, autoTrade);
+    syncLevelSystemState();
+    saveState();
+    resetTradeForm();
+    renderTrades();
+    renderDaily();
+    renderAnalytics();
+    notify("DS Trend와 Auto Logic 기록을 각각 저장했습니다.");
+    return;
+  }
+
+  const id = editingId || uid("trade");
+  const existingIndex = state.trades.findIndex((trade) => trade.id === id);
+  const previous = existingIndex >= 0 ? state.trades[existingIndex] : {};
+  const strategy = normalizeTradeStrategy(rawMode);
+  const calc = calculateTrade();
+  const trade = buildTradeFromForm({ id, previous, strategy, calc, imageIds: allImageIds, pairId: previous.pairId || "" });
 
   if (existingIndex >= 0) state.trades[existingIndex] = trade;
   else state.trades.push(trade);
@@ -1283,7 +1375,8 @@ function resetTradeForm() {
   $("tradeDate").value = localDateString();
   $("tradeAccount").value = state.activeAccount === "live" ? "live" : "demo";
   $("tradeAsset").value = "GOLD";
-  $("tradeStrategy").value = "ds_trend";
+  $("tradeStrategy").value = "both";
+  if ($("autoLogicStrategyType")) $("autoLogicStrategyType").value = "range_program";
   $("customAssetName").value = "";
   $("tradeSymbol").value = "GC";
   $("tradeDirection").value = "long";
@@ -1318,6 +1411,7 @@ async function editTrade(id) {
   $("tradeAsset").value = isStandardAsset ? savedAsset : "CUSTOM";
   $("customAssetName").value = isStandardAsset ? "" : savedAsset;
   updateAssetFieldVisibility(false);
+  if (isAutoLogicStrategy(trade.strategy) && $("autoLogicStrategyType")) $("autoLogicStrategyType").value = normalizeTradeStrategy(trade.strategy);
   updateTradeMode();
   $("followedPlan").checked = Boolean(trade.followedPlan);
   $("ruleViolation").checked = Boolean(trade.ruleViolation);
@@ -1382,6 +1476,7 @@ async function renderTrades() {
             <strong>${escapeHtml(trade.symbol)} · ${trade.direction === "long" ? "LONG" : "SHORT"}</strong>
             <span class="badge asset">${escapeHtml(assetLabel(assetOfTrade(trade)))}</span>
             <span class="badge ${strategyBadgeClass(strategyOfTrade(trade))}">${escapeHtml(strategyLabel(strategyOfTrade(trade)))}</span>
+            ${trade.pairId ? '<span class="badge">DUAL PAIR</span>' : ''}
             <span class="badge ${escapeHtml(trade.account)}">${trade.account === "demo" ? "DEMO" : "LIVE"}</span>
             <span class="badge ${result}">${result === "win" ? "수익" : result === "loss" ? "손실" : "본전"}</span>
             <span class="badge">${formatDate(trade.date)}</span>
