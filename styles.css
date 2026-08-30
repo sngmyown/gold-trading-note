@@ -1099,6 +1099,8 @@ main { padding: 24px clamp(18px, 4vw, 58px) 64px; }
 .strategy-mode-banner { border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; }
 .strategy-mode-banner.ds-mode { color:#f1c75b; background:rgba(241,199,91,.07); border-color:rgba(241,199,91,.22); }
 .strategy-mode-banner.auto-mode { color:#44d48b; background:rgba(68,212,139,.07); border-color:rgba(68,212,139,.22); }
+.strategy-mode-banner.dual-mode { color:#65a9ff; background:rgba(101,169,255,.08); border-color:rgba(101,169,255,.28); }
+.auto-strategy-field { max-width:320px; margin:12px 0; }
 .auto-logic-panel { border:1px solid rgba(68,212,139,.2); background:rgba(68,212,139,.035); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:14px; }
 .auto-logic-panel.hidden { display:none; }
 .auto-logic-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; border-bottom:1px solid var(--border); padding-bottom:12px; }
