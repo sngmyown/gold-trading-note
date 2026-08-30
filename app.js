@@ -1,6 +1,7 @@
 "use strict";
 
 const STORAGE_KEY = "goldTradingReviewV1";
+const PV2_SEED_BRIDGE_KEY = "pv2_gold_futures_accounts_v1";
 const DB_NAME = "goldTradingReviewImagesV1";
 const DB_STORE = "images";
 const DB_VERSION = 1;
@@ -51,6 +52,10 @@ const DEFAULT_STATE = {
   trades: [],
   dailyReviews: {},
   weeklyReviews: [],
+  accountSeeds: {
+    dsTrend: { seed: 0, currency: "USD", updatedAt: null },
+    autoLogic: { seed: 0, currency: "USD", updatedAt: null }
+  },
   strategyGoal: { text: "", color: "#f1c75b", updatedAt: null },
   tradingPrinciples: { items: [...DEFAULT_TRADING_PRINCIPLES], updatedAt: null },
   levelSystem: { unlockedLevel: 1, lastUnlockedAt: null },
@@ -111,7 +116,8 @@ function validateCriticalDom() {
     "todayLabel", "analysisStatus", "activeAccountLabel",
     "analysisView", "tradesView", "dailyView", "weeklyView", "analyticsView", "settingsView",
     "analysisDate", "analysisForm", "tradeForm", "dailyDate", "dailyReviewForm",
-    "analyticsPeriod", "analyticsAccount", "storageWarning"
+    "analyticsPeriod", "analyticsAccount", "storageWarning",
+    "futuresSeedForm", "dsAccountSeed", "autoLogicAccountSeed"
   ];
   const missing = criticalIds.filter((id) => !document.getElementById(id));
   if (missing.length) {
@@ -132,6 +138,26 @@ function normalizeTradingPrinciples(source) {
   return { items, updatedAt: source?.updatedAt || null };
 }
 
+function normalizeSeedCurrency(value) {
+  return String(value || "USD").toUpperCase() === "KRW" ? "KRW" : "USD";
+}
+
+function normalizeAccountSeedItem(source, fallback) {
+  const seed = Number(source?.seed);
+  return {
+    seed: Number.isFinite(seed) && seed >= 0 ? seed : Number(fallback?.seed || 0),
+    currency: normalizeSeedCurrency(source?.currency || fallback?.currency),
+    updatedAt: source?.updatedAt || fallback?.updatedAt || null
+  };
+}
+
+function normalizeAccountSeeds(source) {
+  return {
+    dsTrend: normalizeAccountSeedItem(source?.dsTrend, DEFAULT_STATE.accountSeeds.dsTrend),
+    autoLogic: normalizeAccountSeedItem(source?.autoLogic, DEFAULT_STATE.accountSeeds.autoLogic)
+  };
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -141,6 +167,7 @@ function loadState() {
       ...cloneDefaultState(),
       ...parsed,
       settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) },
+      accountSeeds: normalizeAccountSeeds(parsed.accountSeeds),
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(parsed.strategyGoal || {}) },
       tradingPrinciples: normalizeTradingPrinciples(parsed.tradingPrinciples),
       levelSystem: { ...DEFAULT_STATE.levelSystem, ...(parsed.levelSystem || {}) },
@@ -158,6 +185,7 @@ function loadState() {
 function saveState() {
   state.updatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  writePv2SeedBridge();
   updateHeader();
   renderDataStatus();
 }
@@ -686,12 +714,128 @@ function setupTabs() {
   });
 }
 
+function formatSeedAmount(seed, currency) {
+  const value = Number(seed || 0);
+  if (normalizeSeedCurrency(currency) === "KRW") {
+    return `₩${Math.round(value).toLocaleString("ko-KR")}`;
+  }
+  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function seedTotalsByCurrency() {
+  const seeds = normalizeAccountSeeds(state.accountSeeds);
+  const totals = { USD: 0, KRW: 0 };
+  [seeds.dsTrend, seeds.autoLogic].forEach((item) => {
+    totals[item.currency] += Number(item.seed || 0);
+  });
+  return totals;
+}
+
+function accountSeedBridgePayload() {
+  const seeds = normalizeAccountSeeds(state.accountSeeds);
+  const totals = seedTotalsByCurrency();
+  return {
+    version: 1,
+    source: "gold-futures-trading-review",
+    sourceStorageKey: STORAGE_KEY,
+    updatedAt: state.updatedAt || new Date().toISOString(),
+    accounts: [
+      {
+        id: "gold_ds_trend",
+        name: "Gold Futures · DS Trend",
+        type: "futures",
+        strategy: "ds_trend",
+        execution: "manual",
+        seed: seeds.dsTrend.seed,
+        currency: seeds.dsTrend.currency,
+        updatedAt: seeds.dsTrend.updatedAt
+      },
+      {
+        id: "gold_auto_logic",
+        name: "Gold Futures · Auto Logic",
+        type: "futures",
+        strategy: "auto_logic",
+        execution: "program",
+        seed: seeds.autoLogic.seed,
+        currency: seeds.autoLogic.currency,
+        updatedAt: seeds.autoLogic.updatedAt
+      }
+    ],
+    totalsByCurrency: totals,
+    dsTrendSeed: seeds.dsTrend.seed,
+    dsTrendCurrency: seeds.dsTrend.currency,
+    autoLogicSeed: seeds.autoLogic.seed,
+    autoLogicCurrency: seeds.autoLogic.currency
+  };
+}
+
+function writePv2SeedBridge() {
+  try {
+    localStorage.setItem(PV2_SEED_BRIDGE_KEY, JSON.stringify(accountSeedBridgePayload()));
+  } catch (error) {
+    console.error("PV2 계좌 시드 브리지 저장 실패", error);
+  }
+}
+
+function renderAccountSeeds() {
+  const form = $("futuresSeedForm");
+  if (!form) return;
+  state.accountSeeds = normalizeAccountSeeds(state.accountSeeds);
+  const { dsTrend, autoLogic } = state.accountSeeds;
+  $("dsAccountSeed").value = dsTrend.seed || "";
+  $("dsAccountCurrency").value = dsTrend.currency;
+  $("autoLogicAccountSeed").value = autoLogic.seed || "";
+  $("autoLogicAccountCurrency").value = autoLogic.currency;
+
+  const configured = [dsTrend, autoLogic].filter((item) => Number(item.seed || 0) > 0).length;
+  $("futuresSeedStatus").textContent = `${configured} / 2`;
+  $("futuresSeedStatus").classList.toggle("complete", configured === 2);
+  const latest = [dsTrend.updatedAt, autoLogic.updatedAt].filter(Boolean).sort().pop();
+  $("futuresSeedUpdatedAt").textContent = latest
+    ? `최근 저장 ${new Date(latest).toLocaleString("ko-KR")}`
+    : "아직 저장되지 않음";
+
+  const totals = seedTotalsByCurrency();
+  const parts = [];
+  if (totals.USD > 0) parts.push(formatSeedAmount(totals.USD, "USD"));
+  if (totals.KRW > 0) parts.push(formatSeedAmount(totals.KRW, "KRW"));
+  $("futuresSeedTotal").textContent = parts.length ? parts.join(" + ") : "$0.00";
+  $("futuresSeedPv2Hint").textContent = configured === 2
+    ? "PV2 연결용 계좌 시드 데이터 준비 완료"
+    : "두 실제 계좌 시드를 모두 입력하면 PV2에서 전체 선물자산을 읽을 수 있습니다.";
+}
+
+function setupAccountSeeds() {
+  if (!$("futuresSeedForm")) return;
+  renderAccountSeeds();
+  $("futuresSeedForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const now = new Date().toISOString();
+    state.accountSeeds = {
+      dsTrend: {
+        seed: Math.max(0, Number($("dsAccountSeed").value || 0)),
+        currency: normalizeSeedCurrency($("dsAccountCurrency").value),
+        updatedAt: now
+      },
+      autoLogic: {
+        seed: Math.max(0, Number($("autoLogicAccountSeed").value || 0)),
+        currency: normalizeSeedCurrency($("autoLogicAccountCurrency").value),
+        updatedAt: now
+      }
+    };
+    saveState();
+    renderAccountSeeds();
+    notify("DS Trend · Auto Logic 계좌 시드와 PV2 연결 데이터를 저장했습니다.");
+  });
+}
+
 function updateHeader() {
   const today = localDateString();
   $("todayLabel").textContent = formatDate(today);
   $("analysisStatus").textContent = state.analyses[today] ? "작성 완료" : "미작성";
   $("analysisStatus").style.color = state.analyses[today] ? "var(--green)" : "var(--orange)";
   $("activeAccountLabel").textContent = state.activeAccount === "demo" ? "데모" : state.activeAccount === "live" ? "실제" : "전체";
+  renderAccountSeeds();
   renderStrategyGoal();
   renderTradingPrinciples();
   renderLevelSystem();
@@ -2353,6 +2497,7 @@ async function renderDataStatus() {
     ["거래 기록", `${state.trades.length}건`],
     ["일간 마감", `${Object.keys(state.dailyReviews).length}일`],
     ["주간 리셋", `${state.weeklyReviews.length}건`],
+    ["계좌 시드", `${[state.accountSeeds?.dsTrend, state.accountSeeds?.autoLogic].filter((item) => Number(item?.seed || 0) > 0).length} / 2`],
     ["저장 이미지", `${imageCount}장`]
   ].map(([label,value]) => `<div class="summary-card"><span>${label}</span><strong>${value}</strong></div>`).join("");
 }
@@ -2381,6 +2526,7 @@ async function importBackup(event) {
       ...cloneDefaultState(),
       ...payload.state,
       settings: { ...DEFAULT_STATE.settings, ...(payload.state.settings || {}) },
+      accountSeeds: normalizeAccountSeeds(payload.state.accountSeeds),
       strategyGoal: { ...DEFAULT_STATE.strategyGoal, ...(payload.state.strategyGoal || {}) },
       tradingPrinciples: normalizeTradingPrinciples(payload.state.tradingPrinciples),
       levelSystem: { ...DEFAULT_STATE.levelSystem, ...(payload.state.levelSystem || {}) },
@@ -2404,6 +2550,7 @@ async function clearAllData() {
   if (!accepted) return;
   state = cloneDefaultState();
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(PV2_SEED_BRIDGE_KEY);
   await clearImages();
   location.reload();
 }
@@ -2452,6 +2599,7 @@ async function init() {
   safeRun("HTML 연결 검사", validateCriticalDom);
 
   safeRun("탭 초기화", setupTabs);
+  safeRun("선물 계좌 시드 초기화", setupAccountSeeds);
   safeRun("전략 목표 초기화", setupStrategyGoal);
   safeRun("매매 원칙 초기화", setupTradingPrinciples);
   safeRun("시장 세션 초기화", setupMarketSessions);
@@ -2471,6 +2619,7 @@ async function init() {
     }
   });
 
+  safeRun("PV2 시드 브리지 동기화", writePv2SeedBridge);
   safeRun("상단 상태 렌더링", updateHeader);
   safeRun("계좌 배너 렌더링", renderAccountBanner);
   await safeRunAsync("거래 목록 렌더링", renderTrades);
