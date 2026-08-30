@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="금 선물 매매 복기 대시보드" />
   <title>Gold Futures Trading Review</title>
-  <link rel="stylesheet" href="styles.css?v=11.0.0" />
-  <script src="app.js?v=11.0.0" defer></script>
+  <link rel="stylesheet" href="styles.css?v=13.0.0" />
+  <script src="app.js?v=13.0.0" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -21,6 +21,80 @@
         <div><span>오늘 분석</span><strong id="analysisStatus">미작성</strong></div>
         <div><span>선택 계좌</span><strong id="activeAccountLabel">전체</strong></div>
       </div>
+
+      <section class="futures-seed-card" aria-labelledby="futuresSeedTitle">
+        <div class="futures-seed-head">
+          <div>
+            <span class="futures-seed-kicker">FUTURES CAPITAL · PV2 BRIDGE</span>
+            <strong id="futuresSeedTitle">금 선물 실제 계좌 시드</strong>
+            <small>DS Trend 손매매 계좌와 Auto Logic 프로그램 계좌의 현재 운용 시드를 별도로 관리합니다.</small>
+          </div>
+          <div class="futures-seed-total">
+            <span>설정 상태</span>
+            <strong id="futuresSeedStatus">0 / 2</strong>
+            <small id="futuresSeedUpdatedAt">아직 저장되지 않음</small>
+          </div>
+        </div>
+
+        <form id="futuresSeedForm" class="futures-seed-form">
+          <article class="futures-seed-account ds-account">
+            <div class="futures-seed-account-head">
+              <div>
+                <span>ACCOUNT 01 · MANUAL</span>
+                <strong>DS Trend 계좌</strong>
+              </div>
+              <b>손매매</b>
+            </div>
+            <div class="futures-seed-input-row">
+              <label class="form-field">
+                <span>현재 계좌 시드</span>
+                <input id="dsAccountSeed" type="number" min="0" step="0.01" placeholder="예: 50000" />
+              </label>
+              <label class="form-field seed-currency-field">
+                <span>통화</span>
+                <select id="dsAccountCurrency">
+                  <option value="USD">USD · $</option>
+                  <option value="KRW">KRW · ₩</option>
+                </select>
+              </label>
+            </div>
+            <p>DS Trend 거래별 시드 기록과 별개인 <b>현재 실제 계좌 자산</b>입니다.</p>
+          </article>
+
+          <article class="futures-seed-account auto-account">
+            <div class="futures-seed-account-head">
+              <div>
+                <span>ACCOUNT 02 · PROGRAM</span>
+                <strong>Auto Logic 계좌</strong>
+              </div>
+              <b>프로그램</b>
+            </div>
+            <div class="futures-seed-input-row">
+              <label class="form-field">
+                <span>현재 계좌 시드</span>
+                <input id="autoLogicAccountSeed" type="number" min="0" step="0.01" placeholder="예: 30000" />
+              </label>
+              <label class="form-field seed-currency-field">
+                <span>통화</span>
+                <select id="autoLogicAccountCurrency">
+                  <option value="USD">USD · $</option>
+                  <option value="KRW">KRW · ₩</option>
+                </select>
+              </label>
+            </div>
+            <p>횡보로직·추세로직 프로그램이 함께 사용하는 <b>Auto Logic 실제 계좌 자산</b>입니다.</p>
+          </article>
+
+          <div class="futures-seed-footer">
+            <div class="futures-seed-totals">
+              <span>두 계좌 합계</span>
+              <strong id="futuresSeedTotal">$0.00</strong>
+              <small id="futuresSeedPv2Hint">저장하면 PV2 연결용 데이터도 동시에 갱신됩니다.</small>
+            </div>
+            <button class="button primary" type="submit">계좌 시드 저장</button>
+          </div>
+        </form>
+      </section>
 
       <section class="strategy-goal-card" aria-labelledby="strategyGoalLabel">
         <div class="strategy-goal-head">
